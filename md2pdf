@@ -1,0 +1,577 @@
+#!/usr/bin/env node
+
+/**
+ * md2pdf - Markdown to PDF/HTML Converter
+ * 
+ * Converts Markdown files to beautifully styled HTML and PDF documents
+ * with Night Owl code highlighting and dark mode support.
+ * 
+ * Usage:
+ *   md2pdf <file.md> [options]
+ *   md2pdf <glob-pattern> [options]
+ * 
+ * Examples:
+ *   md2pdf README.md
+ *   md2pdf "docs/*.md" --output ./dist
+ *   md2pdf guide.md --pdf-only
+ *   md2pdf "*.md" --html-only
+ */
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname, basename, resolve, isAbsolute } from 'path';
+import { fileURLToPath } from 'url';
+import { glob } from 'glob';
+import { marked } from 'marked';
+import hljs from 'highlight.js';
+import puppeteer from 'puppeteer';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// CLI colors
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+};
+
+const log = {
+  info: (msg) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`),
+  success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
+  warn: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
+  error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
+  file: (msg) => console.log(`${colors.cyan}📄${colors.reset} ${msg}`),
+};
+
+// Parse command line arguments
+function parseArgs(args) {
+  const options = {
+    files: [],
+    output: process.cwd(),
+    pdfOnly: false,
+    htmlOnly: false,
+    watch: false,
+    help: false,
+    version: false,
+    title: null,
+    serve: false,
+    port: 3000,
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg === '--help' || arg === '-h') {
+      options.help = true;
+    } else if (arg === '--version' || arg === '-v') {
+      options.version = true;
+    } else if (arg === 'serve' || arg === '--serve') {
+      options.serve = true;
+    } else if (arg === '--port' || arg === '-p') {
+      options.port = parseInt(args[++i]) || 3000;
+    } else if (arg === '--output' || arg === '-o') {
+      options.output = args[++i];
+    } else if (arg === '--pdf-only' || arg === '--pdf') {
+      options.pdfOnly = true;
+    } else if (arg === '--html-only' || arg === '--html') {
+      options.htmlOnly = true;
+    } else if (arg === '--title' || arg === '-t') {
+      options.title = args[++i];
+    } else if (!arg.startsWith('-')) {
+      options.files.push(arg);
+    }
+  }
+
+  return options;
+}
+
+// Show help
+function showHelp() {
+  console.log(`
+${colors.bright}md2pdf${colors.reset} - Markdown to PDF/HTML Converter with Night Owl Theme
+
+${colors.bright}USAGE${colors.reset}
+  md2pdf <file.md> [options]
+  md2pdf <glob-pattern> [options]
+  md2pdf serve [--port 3000]
+
+${colors.bright}COMMANDS${colors.reset}
+  serve                 Start the web UI server
+  
+${colors.bright}OPTIONS${colors.reset}
+  -o, --output <dir>    Output directory (default: current directory)
+  --pdf-only, --pdf     Generate only PDF files
+  --html-only, --html   Generate only HTML files
+  -t, --title <title>   Custom document title
+  -p, --port <port>     Port for web server (default: 3000)
+  -h, --help            Show this help message
+  -v, --version         Show version number
+
+${colors.bright}EXAMPLES${colors.reset}
+  ${colors.dim}# Convert a single file${colors.reset}
+  md2pdf README.md
+
+  ${colors.dim}# Convert multiple files${colors.reset}
+  md2pdf "docs/*.md"
+
+  ${colors.dim}# Output to specific directory${colors.reset}
+  md2pdf guide.md --output ./dist
+
+  ${colors.dim}# Generate only HTML${colors.reset}
+  md2pdf "*.md" --html-only
+
+  ${colors.dim}# Generate only PDF${colors.reset}
+  md2pdf report.md --pdf-only
+
+  ${colors.dim}# Start web UI server${colors.reset}
+  md2pdf serve
+  
+  ${colors.dim}# Start on custom port${colors.reset}
+  md2pdf serve --port 8080
+
+${colors.bright}FEATURES${colors.reset}
+  • Night Owl syntax highlighting with italics
+  • Dark/Light mode toggle in HTML
+  • Multiple dark theme presets
+  • Custom color picker
+  • Professional PDF output
+
+${colors.bright}OUTPUT${colors.reset}
+  For each input file (e.g., README.md):
+  • README.html - Interactive HTML with theme toggle
+  • README.pdf  - Print-ready PDF document
+`);
+}
+
+// Show version
+function showVersion() {
+  console.log('md2pdf v1.0.0');
+}
+
+// Configure marked with highlight.js
+marked.setOptions({
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value;
+      } catch (err) {}
+    }
+    try {
+      return hljs.highlightAuto(code).value;
+    } catch (err) {
+      return code;
+    }
+  },
+  langPrefix: 'hljs language-',
+  gfm: true,
+  breaks: false
+});
+
+// Custom renderer
+const renderer = new marked.Renderer();
+renderer.code = function(code, language) {
+  const validLang = language && hljs.getLanguage(language) ? language : '';
+  let highlighted;
+  
+  if (validLang) {
+    try {
+      highlighted = hljs.highlight(code, { language: validLang }).value;
+    } catch (e) {
+      highlighted = hljs.highlightAuto(code).value;
+    }
+  } else {
+    highlighted = hljs.highlightAuto(code).value;
+  }
+  
+  const langLabel = validLang ? ` data-language="${validLang}"` : '';
+  return `<pre${langLabel}><code class="hljs${validLang ? ` language-${validLang}` : ''}">${highlighted}</code></pre>`;
+};
+
+marked.use({ renderer });
+
+// Read CSS from the theme file
+const cssContent = readFileSync(join(__dirname, 'night-owl-theme.css'), 'utf-8');
+
+// HTML template with full dark mode support
+const getHtmlTemplate = (title, content) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <style>
+${cssContent}
+  </style>
+</head>
+<body>
+  <!-- Theme Controls -->
+  <div class="theme-controls">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark/light mode">
+      <span class="icon-sun">☀️</span>
+      <span class="icon-moon">🌙</span>
+    </button>
+    
+    <!-- Color Picker Panel (only visible in dark mode) -->
+    <div class="color-picker-panel" id="colorPickerPanel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h4 style="margin: 0;">🎨 Dark Mode Style</h4>
+        <button onclick="switchToLight()" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s;" title="Switch to light mode" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='none'">☀️</button>
+      </div>
+      <div class="color-presets">
+        <button class="color-preset active" data-variant="night-owl" onclick="setDarkVariant('night-owl')">
+          <span class="color-swatch" style="background-color: #011627;"></span>
+          <span class="color-preset-label">Night Owl</span>
+        </button>
+        <button class="color-preset" data-variant="pure-dark" onclick="setDarkVariant('pure-dark')">
+          <span class="color-swatch" style="background-color: #0f0f0f;"></span>
+          <span class="color-preset-label">Pure Dark</span>
+        </button>
+        <button class="color-preset" data-variant="material-dark" onclick="setDarkVariant('material-dark')">
+          <span class="color-swatch" style="background-color: #202124;"></span>
+          <span class="color-preset-label">Material Dark</span>
+        </button>
+        <button class="color-preset" data-variant="custom" onclick="setDarkVariant('custom')">
+          <span class="color-swatch" id="customSwatch" style="background-color: #1a1a2e;"></span>
+          <span class="color-preset-label">Custom</span>
+        </button>
+      </div>
+      <div class="custom-color-section">
+        <div class="custom-color-row">
+          <input type="color" class="custom-color-input" id="customColorPicker" value="#1a1a2e" onchange="updateCustomColor(this.value)">
+          <input type="text" class="custom-color-hex" id="customColorHex" value="#1a1a2e" placeholder="#000000" onchange="updateCustomColor(this.value)">
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <article class="markdown-body">
+    ${content}
+  </article>
+  
+  <script>
+    const darkVariants = {
+      'night-owl': '#011627',
+      'pure-dark': '#0f0f0f',
+      'material-dark': '#202124',
+      'custom': '#1a1a2e'
+    };
+    
+    function getPreferredTheme() {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    
+    function getSavedDarkVariant() {
+      return localStorage.getItem('darkVariant') || 'night-owl';
+    }
+    
+    function getSavedCustomColor() {
+      return localStorage.getItem('customDarkColor') || '#1a1a2e';
+    }
+    
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      const panel = document.getElementById('colorPickerPanel');
+      if (theme === 'dark') {
+        panel.classList.add('visible');
+      } else {
+        panel.classList.remove('visible');
+      }
+    }
+    
+    function setDarkVariant(variant, keepOpen = false) {
+      document.documentElement.setAttribute('data-dark-variant', variant);
+      localStorage.setItem('darkVariant', variant);
+      document.querySelectorAll('.color-preset').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.variant === variant);
+      });
+      if (variant === 'custom') {
+        applyCustomColor(getSavedCustomColor());
+      }
+      if (!keepOpen && variant !== 'custom') {
+        setTimeout(() => {
+          document.getElementById('colorPickerPanel').classList.remove('visible');
+        }, 300);
+      }
+    }
+    
+    function toggleColorPanel() {
+      document.getElementById('colorPickerPanel').classList.toggle('visible');
+    }
+    
+    function updateCustomColor(color) {
+      if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        if (/^[0-9A-Fa-f]{6}$/.test(color)) {
+          color = '#' + color;
+        } else {
+          return;
+        }
+      }
+      localStorage.setItem('customDarkColor', color);
+      darkVariants['custom'] = color;
+      document.getElementById('customColorPicker').value = color;
+      document.getElementById('customColorHex').value = color;
+      document.getElementById('customSwatch').style.backgroundColor = color;
+      if (document.documentElement.getAttribute('data-dark-variant') === 'custom') {
+        applyCustomColor(color);
+      }
+      setDarkVariant('custom');
+    }
+    
+    function applyCustomColor(color) {
+      const rgb = hexToRgb(color);
+      const isVeryDark = (rgb.r + rgb.g + rgb.b) / 3 < 40;
+      document.documentElement.style.setProperty('--custom-dark-bg', color);
+      document.documentElement.style.setProperty('--custom-dark-text', isVeryDark ? '#e4e4e4' : '#d6deeb');
+      document.documentElement.style.setProperty('--custom-dark-border', lightenColor(color, 15));
+      document.documentElement.style.setProperty('--custom-dark-table', lightenColor(color, 8));
+    }
+    
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 0, b: 0 };
+    }
+    
+    function lightenColor(hex, percent) {
+      const rgb = hexToRgb(hex);
+      const amt = Math.round(2.55 * percent);
+      const r = Math.min(255, rgb.r + amt);
+      const g = Math.min(255, rgb.g + amt);
+      const b = Math.min(255, rgb.b + amt);
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const panel = document.getElementById('colorPickerPanel');
+      if (current === 'dark') {
+        if (panel.classList.contains('visible')) {
+          panel.classList.remove('visible');
+        } else {
+          panel.classList.add('visible');
+        }
+      } else {
+        setTheme('dark');
+      }
+    }
+    
+    function switchToLight() {
+      setTheme('light');
+    }
+    
+    (function init() {
+      const theme = getPreferredTheme();
+      const darkVariant = getSavedDarkVariant();
+      const customColor = getSavedCustomColor();
+      document.getElementById('customColorPicker').value = customColor;
+      document.getElementById('customColorHex').value = customColor;
+      document.getElementById('customSwatch').style.backgroundColor = customColor;
+      darkVariants['custom'] = customColor;
+      if (darkVariant === 'custom') {
+        applyCustomColor(customColor);
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      setDarkVariant(darkVariant, true);
+    })();
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('theme')) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+// Convert a single markdown file
+async function convertFile(mdFilePath, outputDir, options = {}) {
+  const filename = basename(mdFilePath, '.md');
+  const title = options.title || filename;
+  
+  log.file(`Converting: ${basename(mdFilePath)}`);
+  
+  // Read markdown content
+  const mdContent = readFileSync(mdFilePath, 'utf-8');
+  
+  // Convert to HTML
+  const htmlContent = marked.parse(mdContent);
+  const fullHtml = getHtmlTemplate(title, htmlContent);
+  
+  const results = { html: null, pdf: null };
+  
+  // Ensure output directory exists
+  if (!existsSync(outputDir)) {
+    mkdirSync(outputDir, { recursive: true });
+  }
+  
+  // Save HTML
+  if (!options.pdfOnly) {
+    const htmlPath = join(outputDir, `${filename}.html`);
+    writeFileSync(htmlPath, fullHtml);
+    results.html = htmlPath;
+    log.success(`HTML: ${basename(htmlPath)}`);
+  }
+  
+  // Generate PDF
+  if (!options.htmlOnly) {
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    const page = await browser.newPage();
+    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+    
+    const pdfPath = join(outputDir, `${filename}.pdf`);
+    await page.pdf({
+      path: pdfPath,
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '40px',
+        right: '40px',
+        bottom: '40px',
+        left: '40px'
+      },
+      displayHeaderFooter: true,
+      headerTemplate: `
+        <div style="font-size: 10px; width: 100%; text-align: center; color: #6a737d; padding: 10px;">
+          <span style="font-weight: bold;">${title}</span>
+        </div>
+      `,
+      footerTemplate: `
+        <div style="font-size: 10px; width: 100%; display: flex; justify-content: space-between; color: #6a737d; padding: 10px 40px;">
+          <span>Generated with md2pdf</span>
+          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+        </div>
+      `
+    });
+    
+    results.pdf = pdfPath;
+    log.success(`PDF: ${basename(pdfPath)}`);
+    
+    await browser.close();
+  }
+  
+  return results;
+}
+
+// Main function
+async function main() {
+  const args = process.argv.slice(2);
+  const options = parseArgs(args);
+  
+  if (options.help) {
+    showHelp();
+    process.exit(0);
+  }
+  
+  if (options.version) {
+    showVersion();
+    process.exit(0);
+  }
+  
+  // Handle serve command
+  if (options.serve) {
+    const { spawn } = await import('child_process');
+    console.log(`
+${colors.bright}╔════════════════════════════════════════════════╗
+║           ${colors.cyan}md2pdf${colors.reset}${colors.bright} - Web UI Server               ║
+╚════════════════════════════════════════════════╝${colors.reset}
+`);
+    log.info(`Starting web server on port ${options.port}...`);
+    
+    const serverPath = join(__dirname, 'server.mjs');
+    const server = spawn('node', [serverPath, '--port', options.port.toString()], {
+      stdio: 'inherit',
+      cwd: __dirname
+    });
+    
+    server.on('error', (err) => {
+      log.error(`Failed to start server: ${err.message}`);
+      process.exit(1);
+    });
+    
+    return;
+  }
+  
+  if (options.files.length === 0) {
+    log.error('No input files specified');
+    console.log('\nUsage: md2pdf <file.md> [options]');
+    console.log('       md2pdf serve [--port 3000]');
+    console.log('Run "md2pdf --help" for more information\n');
+    process.exit(1);
+  }
+  
+  console.log(`
+${colors.bright}╔════════════════════════════════════════════════╗
+║           ${colors.cyan}md2pdf${colors.reset}${colors.bright} - Markdown Converter          ║
+║        Night Owl Theme • Dark Mode Support       ║
+╚════════════════════════════════════════════════╝${colors.reset}
+`);
+  
+  // Resolve output directory
+  const outputDir = isAbsolute(options.output) 
+    ? options.output 
+    : resolve(process.cwd(), options.output);
+  
+  log.info(`Output directory: ${outputDir}`);
+  
+  // Find all matching files
+  let files = [];
+  for (const pattern of options.files) {
+    const matches = await glob(pattern, { absolute: true });
+    files = files.concat(matches.filter(f => f.endsWith('.md')));
+  }
+  
+  if (files.length === 0) {
+    log.error('No markdown files found matching the pattern');
+    process.exit(1);
+  }
+  
+  log.info(`Found ${files.length} markdown file(s)\n`);
+  
+  const results = {
+    success: [],
+    failed: []
+  };
+  
+  for (const file of files) {
+    try {
+      await convertFile(file, outputDir, options);
+      results.success.push(basename(file));
+    } catch (error) {
+      log.error(`Failed to convert ${basename(file)}: ${error.message}`);
+      results.failed.push(basename(file));
+    }
+    console.log('');
+  }
+  
+  // Summary
+  console.log(`${colors.bright}${'═'.repeat(50)}${colors.reset}`);
+  console.log(`${colors.bright}Summary${colors.reset}`);
+  console.log(`${colors.bright}${'═'.repeat(50)}${colors.reset}`);
+  log.success(`Converted: ${results.success.length} file(s)`);
+  if (results.failed.length > 0) {
+    log.error(`Failed: ${results.failed.length} file(s)`);
+  }
+  console.log(`\n${colors.green}✨ Done!${colors.reset}\n`);
+}
+
+main().catch(err => {
+  log.error(err.message);
+  process.exit(1);
+});

@@ -1,0 +1,30 @@
+{
+  "name": "md2pdf",
+  "version": "1.0.0",
+  "description": "Convert markdown files to PDF/HTML with Night Owl theme and dark mode support",
+  "type": "module",
+  "bin": {
+    "md2pdf": "./md2pdf"
+  },
+  "scripts": {
+    "convert": "node convert-to-pdf.mjs",
+    "serve": "node server.mjs",
+    "start": "node server.mjs"
+  },
+  "keywords": [
+    "markdown",
+    "pdf",
+    "converter",
+    "night-owl",
+    "dark-mode",
+    "syntax-highlighting"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "glob": "^10.5.0",
+    "highlight.js": "^11.9.0",
+    "marked": "^12.0.0",
+    "puppeteer": "^22.0.0"
+  }
+}
