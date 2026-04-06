@@ -10,7 +10,7 @@
  */
 
 import { createServer } from 'http';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { marked } from 'marked';
@@ -73,6 +73,37 @@ marked.use({ renderer });
 // Read CSS
 const cssContent = readFileSync(join(__dirname, 'night-owl-theme.css'), 'utf-8');
 
+// Read favicon
+const faviconSvg = readFileSync(join(__dirname, 'favicon.svg'), 'utf-8');
+
+// Max input size (1MB)
+const MAX_INPUT_SIZE = 1024 * 1024;
+
+// Shared Puppeteer browser instance
+let browserInstance = null;
+
+async function getBrowser() {
+  if (!browserInstance || !browserInstance.isConnected()) {
+    browserInstance = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
+      })
+    });
+  }
+  return browserInstance;
+}
+
+// Sanitize filename to prevent path traversal and invalid characters
+function sanitizeFilename(name) {
+  return name
+    .replace(/[<>:"\/\\|?*\x00-\x1f]/g, '')
+    .replace(/^[\s.]+|[\s.]+$/g, '')
+    .substring(0, 200)
+    || 'document';
+}
+
 // Web UI HTML
 const webUIHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -80,6 +111,7 @@ const webUIHtml = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>md2pdf - Markdown to PDF Converter</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <style>
     * {
       box-sizing: border-box;
@@ -527,6 +559,9 @@ console.log(greeting);
       <div class="panel-header">
         <span class="panel-title">👁️ Live Preview</span>
         <div class="download-options">
+          <button class="btn btn-secondary btn-icon" onclick="togglePreviewTheme()" id="theme-toggle-btn" title="Toggle preview theme">
+            🌙 Dark
+          </button>
           <button class="btn btn-secondary btn-icon" onclick="downloadHtml()" title="Download HTML">
             📄 HTML
           </button>
@@ -569,6 +604,35 @@ console.log(greeting);
     
     let debounceTimer;
     let currentDownloadType = 'pdf';
+    let previewTheme = 'light';
+    let previewDarkVariant = 'night-owl';
+    
+    // Theme toggle for preview iframe
+    function togglePreviewTheme() {
+      previewTheme = previewTheme === 'light' ? 'dark' : 'light';
+      applyPreviewTheme();
+      updateThemeButton();
+    }
+    
+    function applyPreviewTheme() {
+      try {
+        const doc = previewFrame.contentDocument;
+        if (doc && doc.documentElement) {
+          doc.documentElement.setAttribute('data-theme', previewTheme);
+          if (previewTheme === 'dark') {
+            doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+          }
+          // Hide the theme controls inside the iframe (we control from parent)
+          const controls = doc.querySelector('.theme-controls');
+          if (controls) controls.style.display = 'none';
+        }
+      } catch (e) {}
+    }
+    
+    function updateThemeButton() {
+      const btn = document.getElementById('theme-toggle-btn');
+      btn.innerHTML = previewTheme === 'light' ? '🌙 Dark' : '☀️ Light';
+    }
     
     // Update preview on input
     markdownInput.addEventListener('input', () => {
@@ -602,6 +666,9 @@ console.log(greeting);
         doc.open();
         doc.write(html);
         doc.close();
+        
+        // Apply saved preview theme
+        applyPreviewTheme();
         
         setStatus('success', 'Ready');
       } catch (error) {
@@ -718,7 +785,9 @@ console.log(greeting);
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             markdown: markdownInput.value,
-            filename: filename
+            filename: filename,
+            theme: previewTheme,
+            darkVariant: previewDarkVariant
           })
         });
         
@@ -834,6 +903,7 @@ const getDocumentHtml = (content) => `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Preview</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <style>
 ${cssContent}
   </style>
@@ -934,9 +1004,28 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(webUIHtml);
   }
+  else if (url.pathname === '/favicon.svg' && req.method === 'GET') {
+    res.writeHead(200, { 
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=86400'
+    });
+    res.end(faviconSvg);
+  }
+  else if (url.pathname === '/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+  }
   else if (url.pathname === '/api/render' && req.method === 'POST') {
     const body = await parseBody(req);
-    const htmlContent = marked.parse(body.markdown || '');
+    const markdown = body.markdown || '';
+    
+    if (markdown.length > MAX_INPUT_SIZE) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Input too large. Maximum size is 1MB.' }));
+      return;
+    }
+    
+    const htmlContent = marked.parse(markdown);
     const fullHtml = getDocumentHtml(htmlContent);
     
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -945,45 +1034,57 @@ const server = createServer(async (req, res) => {
   else if (url.pathname === '/api/pdf' && req.method === 'POST') {
     try {
       const body = await parseBody(req);
-      const htmlContent = marked.parse(body.markdown || '');
-      const fullHtml = getDocumentHtml(htmlContent);
-      const filename = body.filename || 'document';
+      const markdown = body.markdown || '';
       
-      // Ensure temp directory exists
-      const tempDir = join(__dirname, 'temp');
-      if (!existsSync(tempDir)) {
-        mkdirSync(tempDir, { recursive: true });
+      if (markdown.length > MAX_INPUT_SIZE) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Input too large. Maximum size is 1MB.' }));
+        return;
       }
       
-      // Generate PDF
-      const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
-          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
-        })
-      });
+      const htmlContent = marked.parse(markdown);
+      const fullHtml = getDocumentHtml(htmlContent);
+      const filename = sanitizeFilename(body.filename || 'document');
+      const theme = body.theme || 'light';
+      const darkVariant = body.darkVariant || 'night-owl';
       
+      // Use shared browser instance
+      const browser = await getBrowser();
       const page = await browser.newPage();
-      await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
       
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '40px', right: '40px', bottom: '40px', left: '40px' },
-        displayHeaderFooter: true,
-        headerTemplate: `<div style="font-size:10px;width:100%;text-align:center;color:#6a737d;padding:10px;"><span style="font-weight:bold;">${filename}</span></div>`,
-        footerTemplate: `<div style="font-size:10px;width:100%;display:flex;justify-content:space-between;color:#6a737d;padding:10px 40px;"><span>Generated with md2pdf</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`
-      });
-      
-      await browser.close();
-      
-      res.writeHead(200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}.pdf"`,
-        'Content-Length': pdfBuffer.length
-      });
-      res.end(pdfBuffer);
+      try {
+        await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+        
+        // Apply theme for PDF rendering (use screen media so print CSS doesn't force light)
+        await page.emulateMediaType('screen');
+        await page.evaluate(({ theme, darkVariant }) => {
+          document.documentElement.setAttribute('data-theme', theme);
+          if (theme === 'dark') {
+            document.documentElement.setAttribute('data-dark-variant', darkVariant);
+          }
+          // Hide theme controls in PDF output
+          const controls = document.querySelector('.theme-controls');
+          if (controls) controls.style.display = 'none';
+        }, { theme, darkVariant });
+        
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '40px', right: '40px', bottom: '40px', left: '40px' },
+          displayHeaderFooter: true,
+          headerTemplate: `<div style="font-size:10px;width:100%;text-align:center;color:#6a737d;padding:10px;"><span style="font-weight:bold;">${filename}</span></div>`,
+          footerTemplate: `<div style="font-size:10px;width:100%;display:flex;justify-content:space-between;color:#6a737d;padding:10px 40px;"><span>Generated with md2pdf</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`
+        });
+        
+        res.writeHead(200, {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}.pdf"`,
+          'Content-Length': pdfBuffer.length
+        });
+        res.end(pdfBuffer);
+      } finally {
+        await page.close();
+      }
     } catch (error) {
       console.error('PDF generation error:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1014,3 +1115,14 @@ Features:
 Press Ctrl+C to stop the server
 `);
 });
+
+// Graceful shutdown - close shared browser
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, async () => {
+    console.log('\\nShutting down...');
+    if (browserInstance) {
+      await browserInstance.close().catch(() => {});
+    }
+    process.exit(0);
+  });
+}
