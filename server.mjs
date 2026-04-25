@@ -488,6 +488,239 @@ const webUIHtml = `<!DOCTYPE html>
       font-size: 18px;
       color: var(--accent);
     }
+    
+    /* Fullscreen Preview Mode */
+    .main.fullscreen {
+      grid-template-columns: 1fr;
+    }
+    
+    .main.fullscreen .editor-panel {
+      display: none;
+    }
+    
+    .main.fullscreen .preview-panel {
+      border-left: none;
+    }
+    
+    .fullscreen-btn {
+      font-size: 16px;
+    }
+    
+    /* Tab System */
+    .tabs-container {
+      display: flex;
+      background-color: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 8px 0;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    
+    .tabs-container::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .tabs-container::-webkit-scrollbar-thumb {
+      background-color: var(--border);
+      border-radius: 2px;
+    }
+    
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 13px;
+      max-width: 180px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    .tab:hover {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    
+    .tab.active {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      border-color: var(--accent);
+      border-bottom: 1px solid var(--bg-primary);
+      margin-bottom: -1px;
+    }
+    
+    .tab-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .tab-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+    
+    .tab-close:hover {
+      background-color: var(--error);
+      color: #fff;
+    }
+    
+    .add-tab-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background-color: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 8px 8px 0 0;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+    
+    .add-tab-btn:hover {
+      background-color: var(--bg-secondary);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    .save-tab-btn {
+      background-color: var(--success);
+      color: #011627;
+    }
+    
+    .save-tab-btn:hover {
+      filter: brightness(1.1);
+    }
+    
+    /* Adjust main height when tabs are shown */
+    body.has-tabs .main {
+      height: calc(100vh - 73px - 49px);
+    }
+    
+    /* Tab empty state */
+    .no-tabs-message {
+      color: var(--text-secondary);
+      font-size: 12px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Theme Dropdown */
+    .theme-dropdown-wrapper {
+      position: relative;
+    }
+    
+    .theme-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 220px;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .theme-dropdown.visible {
+      display: block;
+    }
+    
+    .theme-dropdown h4 {
+      margin: 0 0 12px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    
+    .theme-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      background: none;
+      width: 100%;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+    
+    .theme-option:hover {
+      background-color: var(--bg-tertiary);
+    }
+    
+    .theme-option.active {
+      border-color: var(--accent);
+      background-color: rgba(130, 170, 255, 0.1);
+    }
+    
+    .theme-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    
+    .theme-divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 10px 0;
+    }
+    
+    .custom-color-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    .custom-color-input {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0;
+    }
+    
+    .custom-color-hex {
+      flex: 1;
+      padding: 8px 10px;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: monospace;
+    }
+    
+    .custom-color-hex:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -507,8 +740,16 @@ const webUIHtml = `<!DOCTYPE html>
       <button class="btn btn-secondary" onclick="clearEditor()">
         🗑️ Clear
       </button>
+      <button class="btn btn-primary save-tab-btn" onclick="saveAsTab()" title="Save current document as a tab">
+        📑 Save Tab
+      </button>
     </div>
   </header>
+  
+  <!-- Tabs Container -->
+  <div class="tabs-container" id="tabs-container" style="display: none;">
+    <span class="no-tabs-message" id="no-tabs-message">No saved tabs yet. Click "Save Tab" to save the current document.</span>
+  </div>
   
   <!-- Main Content -->
   <main class="main">
@@ -559,9 +800,46 @@ console.log(greeting);
       <div class="panel-header">
         <span class="panel-title">👁️ Live Preview</span>
         <div class="download-options">
-          <button class="btn btn-secondary btn-icon" onclick="togglePreviewTheme()" id="theme-toggle-btn" title="Toggle preview theme">
-            🌙 Dark
+          <button class="btn btn-secondary btn-icon fullscreen-btn" onclick="toggleFullscreen()" id="fullscreen-btn" title="Toggle fullscreen preview">
+            ⛶
           </button>
+          <div class="theme-dropdown-wrapper">
+            <button class="btn btn-secondary btn-icon" onclick="toggleThemeDropdown()" id="theme-toggle-btn" title="Toggle preview theme">
+              🌙 Dark
+            </button>
+            <div class="theme-dropdown" id="theme-dropdown">
+              <h4>☀️ Light Mode</h4>
+              <button class="theme-option active" data-theme="light" onclick="setPreviewTheme('light')">
+                <span class="theme-swatch" style="background-color: #ffffff;"></span>
+                <span>Light</span>
+              </button>
+              
+              <div class="theme-divider"></div>
+              <h4>🌙 Dark Mode Variants</h4>
+              
+              <button class="theme-option" data-theme="dark" data-variant="night-owl" onclick="setPreviewTheme('dark', 'night-owl')">
+                <span class="theme-swatch" style="background-color: #011627;"></span>
+                <span>Night Owl</span>
+              </button>
+              <button class="theme-option" data-theme="dark" data-variant="pure-dark" onclick="setPreviewTheme('dark', 'pure-dark')">
+                <span class="theme-swatch" style="background-color: #0f0f0f;"></span>
+                <span>Pure Dark</span>
+              </button>
+              <button class="theme-option" data-theme="dark" data-variant="material-dark" onclick="setPreviewTheme('dark', 'material-dark')">
+                <span class="theme-swatch" style="background-color: #202124;"></span>
+                <span>Material Dark</span>
+              </button>
+              <button class="theme-option" data-theme="dark" data-variant="custom" onclick="setPreviewTheme('dark', 'custom')">
+                <span class="theme-swatch" id="custom-swatch" style="background-color: #1a1a2e;"></span>
+                <span>Custom</span>
+              </button>
+              
+              <div class="custom-color-row">
+                <input type="color" class="custom-color-input" id="custom-color-picker" value="#1a1a2e" onchange="updateCustomDarkColor(this.value)">
+                <input type="text" class="custom-color-hex" id="custom-color-hex" value="#1a1a2e" placeholder="#000000" onchange="updateCustomDarkColor(this.value)">
+              </div>
+            </div>
+          </div>
           <button class="btn btn-secondary btn-icon" onclick="downloadHtml()" title="Download HTML">
             📄 HTML
           </button>
@@ -606,12 +884,310 @@ console.log(greeting);
     let currentDownloadType = 'pdf';
     let previewTheme = 'light';
     let previewDarkVariant = 'night-owl';
+    let isFullscreen = false;
+    let tabs = [];
+    let activeTabId = null;
+    let tabIdCounter = 0;
     
-    // Theme toggle for preview iframe
+    // Load tabs from localStorage
+    function loadTabsFromStorage() {
+      try {
+        const saved = localStorage.getItem('md2pdf-tabs');
+        if (saved) {
+          const data = JSON.parse(saved);
+          tabs = data.tabs || [];
+          tabIdCounter = data.tabIdCounter || 0;
+          renderTabs();
+        }
+      } catch (e) {
+        console.error('Failed to load tabs:', e);
+      }
+    }
+    
+    // Save tabs to localStorage
+    function saveTabsToStorage() {
+      try {
+        localStorage.setItem('md2pdf-tabs', JSON.stringify({ tabs, tabIdCounter }));
+      } catch (e) {
+        console.error('Failed to save tabs:', e);
+      }
+    }
+    
+    // Fullscreen preview toggle
+    function toggleFullscreen() {
+      isFullscreen = !isFullscreen;
+      const main = document.querySelector('.main');
+      const btn = document.getElementById('fullscreen-btn');
+      
+      if (isFullscreen) {
+        main.classList.add('fullscreen');
+        btn.innerHTML = '⛶';
+        btn.title = 'Exit fullscreen';
+      } else {
+        main.classList.remove('fullscreen');
+        btn.innerHTML = '⛶';
+        btn.title = 'Toggle fullscreen preview';
+      }
+    }
+    
+    // Tab Management Functions
+    function saveAsTab() {
+      const content = markdownInput.value;
+      if (!content.trim()) {
+        showToast('Nothing to save - editor is empty', 'error');
+        return;
+      }
+      
+      // Extract title from first heading or use default
+      const titleMatch = content.match(/^#\\s+(.+)$/m);
+      let title = titleMatch ? titleMatch[1].substring(0, 30) : 'Untitled';
+      if (titleMatch && titleMatch[1].length > 30) title += '...';
+      
+      const tab = {
+        id: ++tabIdCounter,
+        title: title,
+        content: content,
+        theme: previewTheme,
+        createdAt: new Date().toISOString()
+      };
+      
+      tabs.push(tab);
+      saveTabsToStorage();
+      renderTabs();
+      switchToTab(tab.id);
+      showToast('Saved as tab: ' + title, 'success');
+    }
+    
+    function renderTabs() {
+      const container = document.getElementById('tabs-container');
+      const noTabsMessage = document.getElementById('no-tabs-message');
+      
+      if (tabs.length === 0) {
+        container.style.display = 'none';
+        document.body.classList.remove('has-tabs');
+        return;
+      }
+      
+      container.style.display = 'flex';
+      document.body.classList.add('has-tabs');
+      
+      // Clear existing tabs except the add button
+      container.innerHTML = '';
+      
+      // Render each tab
+      tabs.forEach(tab => {
+        const tabEl = document.createElement('div');
+        tabEl.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+        tabEl.onclick = (e) => {
+          if (e.target.classList.contains('tab-close')) return;
+          switchToTab(tab.id);
+        };
+        
+        tabEl.innerHTML = \`
+          <span class="tab-title">\${escapeHtml(tab.title)}</span>
+          <button class="tab-close" onclick="closeTab(\${tab.id}, event)" title="Close tab">&times;</button>
+        \`;
+        
+        container.appendChild(tabEl);
+      });
+      
+      // Add "new tab" button
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-tab-btn';
+      addBtn.onclick = newTab;
+      addBtn.title = 'New document';
+      addBtn.innerHTML = '+';
+      container.appendChild(addBtn);
+    }
+    
+    function switchToTab(tabId) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (!tab) return;
+      
+      activeTabId = tabId;
+      markdownInput.value = tab.content;
+      previewTheme = tab.theme || 'light';
+      updateThemeButton();
+      updateCharCount();
+      renderPreview();
+      renderTabs();
+    }
+    
+    function closeTab(tabId, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      
+      const index = tabs.findIndex(t => t.id === tabId);
+      if (index === -1) return;
+      
+      tabs.splice(index, 1);
+      saveTabsToStorage();
+      
+      // If closing active tab, switch to another or clear
+      if (activeTabId === tabId) {
+        if (tabs.length > 0) {
+          const newIndex = Math.min(index, tabs.length - 1);
+          switchToTab(tabs[newIndex].id);
+        } else {
+          activeTabId = null;
+          newTab();
+        }
+      }
+      
+      renderTabs();
+      showToast('Tab closed', 'success');
+    }
+    
+    function newTab() {
+      activeTabId = null;
+      markdownInput.value = '';
+      updateCharCount();
+      renderPreview();
+      renderTabs();
+    }
+    
+    function updateCurrentTab() {
+      if (activeTabId) {
+        const tab = tabs.find(t => t.id === activeTabId);
+        if (tab) {
+          tab.content = markdownInput.value;
+          // Update title if content changed
+          const titleMatch = tab.content.match(/^#\\s+(.+)$/m);
+          if (titleMatch) {
+            tab.title = titleMatch[1].substring(0, 30);
+            if (titleMatch[1].length > 30) tab.title += '...';
+          }
+          tab.theme = previewTheme;
+          saveTabsToStorage();
+          renderTabs();
+        }
+      }
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Load custom color from storage
+    let customDarkColor = localStorage.getItem('md2pdf-customDarkColor') || '#1a1a2e';
+    
+    // Initialize custom color inputs
+    function initCustomColor() {
+      document.getElementById('custom-color-picker').value = customDarkColor;
+      document.getElementById('custom-color-hex').value = customDarkColor;
+      document.getElementById('custom-swatch').style.backgroundColor = customDarkColor;
+    }
+    
+    // Toggle theme dropdown
+    function toggleThemeDropdown() {
+      const dropdown = document.getElementById('theme-dropdown');
+      dropdown.classList.toggle('visible');
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('theme-dropdown');
+      const wrapper = e.target.closest('.theme-dropdown-wrapper');
+      if (!wrapper && dropdown.classList.contains('visible')) {
+        dropdown.classList.remove('visible');
+      }
+    });
+    
+    // Set preview theme
+    function setPreviewTheme(theme, variant) {
+      previewTheme = theme;
+      if (variant) {
+        previewDarkVariant = variant;
+      }
+      applyPreviewTheme();
+      updateThemeButton();
+      updateThemeOptions();
+      
+      // If custom variant selected, apply custom color
+      if (variant === 'custom') {
+        applyCustomColorToPreview(customDarkColor);
+      }
+    }
+    
+    // Update custom dark color
+    function updateCustomDarkColor(color) {
+      if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        if (/^[0-9A-Fa-f]{6}$/.test(color)) {
+          color = '#' + color;
+        } else {
+          return;
+        }
+      }
+      
+      customDarkColor = color;
+      localStorage.setItem('md2pdf-customDarkColor', color);
+      
+      document.getElementById('custom-color-picker').value = color;
+      document.getElementById('custom-color-hex').value = color;
+      document.getElementById('custom-swatch').style.backgroundColor = color;
+      
+      // If custom is active, apply the new color
+      if (previewDarkVariant === 'custom') {
+        applyCustomColorToPreview(color);
+      }
+      
+      // Automatically select custom variant
+      setPreviewTheme('dark', 'custom');
+    }
+    
+    // Apply custom color to preview iframe
+    function applyCustomColorToPreview(color) {
+      try {
+        const doc = previewFrame.contentDocument;
+        if (doc && doc.documentElement) {
+          const rgb = hexToRgb(color);
+          const isDark = (rgb.r + rgb.g + rgb.b) / 3 < 40;
+          
+          doc.documentElement.style.setProperty('--custom-dark-bg', color);
+          doc.documentElement.style.setProperty('--custom-dark-text', isDark ? '#e4e4e4' : '#d6deeb');
+          doc.documentElement.style.setProperty('--custom-dark-border', lightenColor(color, 15));
+          doc.documentElement.style.setProperty('--custom-dark-table', lightenColor(color, 8));
+        }
+      } catch (e) {}
+    }
+    
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 0, b: 0 };
+    }
+    
+    function lightenColor(hex, percent) {
+      const rgb = hexToRgb(hex);
+      const amount = Math.round(2.55 * percent);
+      return '#' + [
+        Math.min(255, rgb.r + amount),
+        Math.min(255, rgb.g + amount),
+        Math.min(255, rgb.b + amount)
+      ].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    
+    // Update theme options active state
+    function updateThemeOptions() {
+      document.querySelectorAll('.theme-option').forEach(opt => {
+        const isActive = opt.dataset.theme === previewTheme && 
+          (previewTheme === 'light' || opt.dataset.variant === previewDarkVariant);
+        opt.classList.toggle('active', isActive);
+      });
+    }
+    
+    // Theme toggle for preview iframe (legacy, replaced by setPreviewTheme)
     function togglePreviewTheme() {
       previewTheme = previewTheme === 'light' ? 'dark' : 'light';
       applyPreviewTheme();
       updateThemeButton();
+      updateThemeOptions();
     }
     
     function applyPreviewTheme() {
@@ -621,6 +1197,10 @@ console.log(greeting);
           doc.documentElement.setAttribute('data-theme', previewTheme);
           if (previewTheme === 'dark') {
             doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+            // Apply custom color if custom variant
+            if (previewDarkVariant === 'custom') {
+              applyCustomColorToPreview(customDarkColor);
+            }
           }
           // Hide the theme controls inside the iframe (we control from parent)
           const controls = doc.querySelector('.theme-controls');
@@ -631,13 +1211,36 @@ console.log(greeting);
     
     function updateThemeButton() {
       const btn = document.getElementById('theme-toggle-btn');
-      btn.innerHTML = previewTheme === 'light' ? '🌙 Dark' : '☀️ Light';
+      if (previewTheme === 'light') {
+        btn.innerHTML = '\u2600\ufe0f Light';
+      } else {
+        const variantNames = {
+          'night-owl': 'Night Owl',
+          'pure-dark': 'Pure Dark',
+          'material-dark': 'Material',
+          'custom': 'Custom'
+        };
+        const name = variantNames[previewDarkVariant] || 'Dark';
+        btn.innerHTML = '\ud83c\udf19 ' + name;
+      }
+    }
+    
+    // Debounced tab save
+    let tabSaveTimer;
+    function debouncedTabSave() {
+      clearTimeout(tabSaveTimer);
+      tabSaveTimer = setTimeout(() => {
+        if (activeTabId) {
+          updateCurrentTab();
+        }
+      }, 1000);
     }
     
     // Update preview on input
     markdownInput.addEventListener('input', () => {
       updateCharCount();
       debouncedRender();
+      debouncedTabSave();
     });
     
     function updateCharCount() {
@@ -890,7 +1493,16 @@ console.log(greeting);
       }
     });
     
-    // Initial render
+    // Escape key exits fullscreen
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        toggleFullscreen();
+      }
+    });
+    
+    // Initial render and load tabs
+    initCustomColor();
+    loadTabsFromStorage();
     renderPreview();
   </script>
 </body>
