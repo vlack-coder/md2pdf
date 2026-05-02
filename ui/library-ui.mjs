@@ -126,6 +126,11 @@ export const libraryStyles = `
       gap: 8px;
       font-size: 13px;
       color: var(--text-primary);
+      user-select: none;
+    }
+    
+    .book-item {
+      cursor: pointer !important;
     }
     
     .folder-item:hover, .book-item:hover {
@@ -700,6 +705,7 @@ export const librarySidebarHtml = `
     
     <div class="selection-actions" id="selection-actions">
       <span class="selection-count">0 selected</span>
+      <button class="selection-btn" onclick="openSelectedBooks()" style="color: var(--accent);">📂 Open</button>
       <button class="selection-btn" onclick="selectAllBooks()">Select All</button>
       <button class="selection-btn" onclick="clearSelection()">Clear</button>
     </div>
@@ -720,7 +726,8 @@ export const librarySidebarHtml = `
       
       <div class="library-section" id="books-section" style="display: none;">
         <div class="library-section-header">
-          <span>Recent Books</span>
+          <span id="books-section-title">All Books</span>
+          <button class="library-btn" id="show-all-books-btn" style="display: none; font-size: 11px; padding: 2px 6px;" onclick="showAllBooks()">Show All</button>
         </div>
         <div id="books-list"></div>
       </div>
@@ -838,6 +845,8 @@ export const userMenuHtml = `
 
 // Library JavaScript functions
 export const libraryScript = `
+    console.log('🔧 Library script starting...');
+    
     // ==================== LIBRARY STATE ====================
     let currentUser = null;
     let libraryFolders = [];
@@ -1016,6 +1025,7 @@ export const libraryScript = `
         .join('');
       
       updateSelectionUI();
+      initDragDropListeners();
     }
     
     function renderBookItem(book) {
@@ -1023,14 +1033,11 @@ export const libraryScript = `
       return \`
         <div class="book-item\${isSelected ? ' selected' : ''}" 
              data-book-id="\${book.id}"
-             draggable="true"
-             ondragstart="handleDragStart(event, '\${book.id}')"
-             ondragend="handleDragEnd(event)">
+             draggable="true">
           <input type="checkbox" class="book-checkbox" 
-                 \${isSelected ? 'checked' : ''}
-                 onclick="toggleBookSelection(event, '\${book.id}')">
+                 \${isSelected ? 'checked' : ''}>
           <span class="book-icon">\${getBookIcon(book.file_type)}</span>
-          <span class="book-title" onclick="openBook('\${book.id}')">\${escapeHtml(book.title)}</span>
+          <span class="book-title">\${escapeHtml(book.title)}</span>
         </div>
       \`;
     }
@@ -1041,12 +1048,7 @@ export const libraryScript = `
       
       return \`
         <div class="folder-item\${folder.id === selectedFolderId ? ' active' : ''}" 
-             data-folder-id="\${folder.id}"
-             onclick="selectFolder('\${folder.id}')"
-             ondragover="handleDragOver(event)"
-             ondragenter="handleDragEnter(event)"
-             ondragleave="handleDragLeave(event)"
-             ondrop="handleDrop(event, '\${folder.id}')">
+             data-folder-id="\${folder.id}">
           <span class="folder-toggle">\${children.length > 0 ? '▶' : ''}</span>
           <span class="folder-icon">📁</span>
           <span class="folder-name">\${escapeHtml(folder.name)}</span>
@@ -1071,8 +1073,20 @@ export const libraryScript = `
       return div.innerHTML;
     }
     
-    async function selectFolder(folderId) {
+    async function selectFolder(folderId, folderElement) {
       selectedFolderId = folderId;
+      
+      // Update section title to show folder name
+      const folder = libraryFolders.find(f => f.id === folderId);
+      const titleEl = document.getElementById('books-section-title');
+      const showAllBtn = document.getElementById('show-all-books-btn');
+      
+      if (titleEl && folder) {
+        titleEl.textContent = '📁 ' + escapeHtml(folder.name);
+      }
+      if (showAllBtn) {
+        showAllBtn.style.display = 'inline';
+      }
       
       // Fetch books in this folder
       const token = localStorage.getItem('auth_token');
@@ -1084,17 +1098,51 @@ export const libraryScript = `
         
         // Update books list to show only this folder's books
         const booksList = document.getElementById('books-list');
-        booksList.innerHTML = (data.books || [])
-          .map(book => renderBookItem(book))
-          .join('');
+        const folderBooks = data.books || [];
+        
+        if (folderBooks.length === 0) {
+          booksList.innerHTML = '<div class="library-empty-text" style="padding: 20px; text-align: center;">No books in this folder.<br><small>Drag books here to add them.</small></div>';
+        } else {
+          booksList.innerHTML = folderBooks.map(book => renderBookItem(book)).join('');
+        }
         
         document.getElementById('books-section').style.display = 'block';
         document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+        
+        // Highlight selected folder
+        if (folderElement) {
+          folderElement.classList.add('active');
+        } else {
+          const el = document.querySelector(\`.folder-item[data-folder-id="\${folderId}"]\`);
+          if (el) el.classList.add('active');
+        }
+        
         updateSelectionUI();
+        initDragDropListeners(); // Re-init for new book items
       } catch (err) {
         console.error('Failed to load folder:', err);
       }
+    }
+    
+    function showAllBooks() {
+      selectedFolderId = null;
+      
+      // Reset section title
+      const titleEl = document.getElementById('books-section-title');
+      const showAllBtn = document.getElementById('show-all-books-btn');
+      
+      if (titleEl) {
+        titleEl.textContent = 'All Books';
+      }
+      if (showAllBtn) {
+        showAllBtn.style.display = 'none';
+      }
+      
+      // Deselect all folders
+      document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+      
+      // Render all books
+      renderLibrary();
     }
     
     async function openBook(bookId) {
@@ -1105,18 +1153,64 @@ export const libraryScript = `
         const res = await fetch('/api/books/' + bookId, { headers });
         const data = await res.json();
         
-        if (data.book && data.book.file_path) {
-          // Load book content
-          const contentRes = await fetch('/files/' + data.book.file_path, { headers });
-          const content = await contentRes.text();
-          
-          document.getElementById('markdown-input').value = content;
-          renderPreview();
-          showToast('success', 'Loaded: ' + data.book.title);
+        if (!data.book) {
+          showToast('error', 'Book not found');
+          return;
         }
+        
+        let content = '';
+        const book = data.book;
+        
+        // Try to load from file_path first
+        if (book.file_path) {
+          try {
+            const contentRes = await fetch('/files/' + book.file_path, { headers });
+            if (contentRes.ok) {
+              content = await contentRes.text();
+            }
+          } catch (e) {
+            console.warn('Could not load file from path:', e);
+          }
+        }
+        
+        // Fall back to content stored in metadata
+        if (!content && book.metadata && book.metadata.content) {
+          content = book.metadata.content;
+        }
+        
+        if (!content) {
+          showToast('error', 'No content found for this book');
+          return;
+        }
+        
+        // Create a new tab for this book (or switch to existing)
+        if (typeof createNewTab === 'function') {
+          createNewTab(book.title, content);
+        } else {
+          // Fallback: just load into editor
+          document.getElementById('markdown-input').value = content;
+          if (typeof renderPreview === 'function') renderPreview();
+        }
+        
+        showToast('success', 'Opened: ' + book.title);
       } catch (err) {
+        console.error('Failed to load book:', err);
         showToast('error', 'Failed to load book');
       }
+    }
+    
+    // Open multiple books at once (e.g., from multi-select)
+    async function openSelectedBooks() {
+      if (selectedBookIds.size === 0) {
+        showToast('error', 'No books selected');
+        return;
+      }
+      
+      for (const bookId of selectedBookIds) {
+        await openBook(bookId);
+      }
+      
+      clearSelection();
     }
     
     async function searchLibrary(query) {
@@ -1401,7 +1495,107 @@ By Type:
       updateSelectionUI();
     }
     
-    function handleDragStart(event, bookId) {
+    // Initialize drag/drop event listeners using event delegation
+    function initDragDropListeners() {
+      const libraryContent = document.getElementById('library-content');
+      if (!libraryContent) return;
+      
+      // Remove old listeners by cloning (clean slate)
+      const newContent = libraryContent.cloneNode(true);
+      libraryContent.parentNode.replaceChild(newContent, libraryContent);
+      
+      const content = document.getElementById('library-content');
+      
+      // Book item clicks (for opening and selection)
+      content.addEventListener('click', (e) => {
+        const bookItem = e.target.closest('.book-item');
+        const folderItem = e.target.closest('.folder-item');
+        const checkbox = e.target.closest('.book-checkbox');
+        
+        if (checkbox && bookItem) {
+          e.stopPropagation();
+          const bookId = bookItem.dataset.bookId;
+          toggleBookSelection(e, bookId);
+          return;
+        }
+        
+        // Click anywhere on book item (except checkbox) opens it
+        if (bookItem && !checkbox) {
+          e.stopPropagation();
+          const bookId = bookItem.dataset.bookId;
+          openBook(bookId);
+          return;
+        }
+        
+        if (folderItem && !bookItem) {
+          const folderId = folderItem.dataset.folderId;
+          if (folderId) {
+            selectFolder(folderId, folderItem);
+          }
+          return;
+        }
+      });
+      
+      // Drag start on book items
+      content.addEventListener('dragstart', (e) => {
+        const bookItem = e.target.closest('.book-item');
+        if (bookItem) {
+          const bookId = bookItem.dataset.bookId;
+          handleDragStartEvent(e, bookId);
+        }
+      });
+      
+      // Drag end
+      content.addEventListener('dragend', (e) => {
+        document.querySelectorAll('.book-item.dragging').forEach(el => {
+          el.classList.remove('dragging');
+        });
+        draggedBookIds = [];
+      });
+      
+      // Folder drag over/enter/leave/drop
+      content.addEventListener('dragover', (e) => {
+        const folderItem = e.target.closest('.folder-item');
+        if (folderItem) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }
+      });
+      
+      content.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        const folderItem = e.target.closest('.folder-item');
+        if (folderItem) {
+          folderItem.classList.add('drag-over');
+        }
+      });
+      
+      content.addEventListener('dragleave', (e) => {
+        const folderItem = e.target.closest('.folder-item');
+        if (folderItem) {
+          const relatedTarget = e.relatedTarget;
+          if (!folderItem.contains(relatedTarget)) {
+            folderItem.classList.remove('drag-over');
+          }
+        }
+      });
+      
+      content.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const folderItem = e.target.closest('.folder-item');
+        if (folderItem) {
+          folderItem.classList.remove('drag-over');
+          const folderId = folderItem.dataset.folderId;
+          if (folderId) {
+            handleDropEvent(folderId);
+          }
+        }
+      });
+      
+      console.log('📚 Drag & drop listeners initialized');
+    }
+    
+    function handleDragStartEvent(event, bookId) {
       // If the dragged book isn't selected, only drag that one
       if (!selectedBookIds.has(bookId)) {
         draggedBookIds = [bookId];
@@ -1409,6 +1603,8 @@ By Type:
         // Drag all selected books
         draggedBookIds = Array.from(selectedBookIds);
       }
+      
+      console.log('Drag started - books:', draggedBookIds);
       
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', JSON.stringify(draggedBookIds));
@@ -1464,6 +1660,7 @@ By Type:
     
     async function handleDrop(event, folderId) {
       event.preventDefault();
+      event.stopPropagation();
       
       const folderItem = event.target.closest('.folder-item');
       if (folderItem) {
@@ -1473,12 +1670,28 @@ By Type:
       // Get dragged book IDs
       let bookIds;
       try {
-        bookIds = JSON.parse(event.dataTransfer.getData('text/plain'));
+        const data = event.dataTransfer.getData('text/plain');
+        bookIds = data ? JSON.parse(data) : draggedBookIds;
       } catch (e) {
         bookIds = draggedBookIds;
       }
       
-      if (!bookIds || bookIds.length === 0) return;
+      await moveBooks(bookIds, folderId);
+    }
+    
+    async function handleDropEvent(folderId) {
+      // Uses the global draggedBookIds set during dragstart
+      const bookIds = [...draggedBookIds];
+      await moveBooks(bookIds, folderId);
+    }
+    
+    async function moveBooks(bookIds, folderId) {
+      console.log('Drop detected - folder:', folderId, 'books:', bookIds);
+      
+      if (!bookIds || bookIds.length === 0) {
+        console.log('No books to drop');
+        return;
+      }
       
       // Move books to folder
       const token = localStorage.getItem('auth_token');
@@ -1492,18 +1705,24 @@ By Type:
       
       for (const bookId of bookIds) {
         try {
+          console.log('Moving book', bookId, 'to folder', folderId);
           const res = await fetch('/api/books/' + bookId, {
             method: 'PATCH',
             headers,
             body: JSON.stringify({ folder_id: folderId })
           });
           
+          const result = await res.json();
+          console.log('Move result:', result);
+          
           if (res.ok) {
             successCount++;
           } else {
+            console.error('Move failed:', result);
             errorCount++;
           }
         } catch (err) {
+          console.error('Move error:', err);
           errorCount++;
         }
       }
@@ -1511,6 +1730,14 @@ By Type:
       // Clear selection and refresh
       clearSelection();
       await refreshLibrary();
+      
+      // If we were viewing a folder, refresh that view
+      if (selectedFolderId) {
+        const folderEl = document.querySelector(\`.folder-item[data-folder-id="\${selectedFolderId}"]\`);
+        if (folderEl) {
+          folderEl.click();
+        }
+      }
       
       if (successCount > 0) {
         showToast('success', \`Moved \${successCount} file\${successCount > 1 ? 's' : ''} to folder\`);
@@ -1555,7 +1782,34 @@ By Type:
       }
     });
     
+    // Expose ALL functions to global scope for inline event handlers
+    // Auth functions
+    window.openAuthModal = openAuthModal;
+    window.closeAuthModal = closeAuthModal;
+    window.switchAuthTab = switchAuthTab;
+    window.handleAuthSubmit = handleAuthSubmit;
+    window.handleSignOut = handleSignOut;
+    window.toggleUserDropdown = toggleUserDropdown;
+    window.openLibraryStats = openLibraryStats;
+    
+    // Library functions
+    window.toggleLibrarySidebar = toggleLibrarySidebar;
+    window.refreshLibrary = refreshLibrary;
+    window.createNewFolder = createNewFolder;
+    window.saveToLibrary = saveToLibrary;
+    window.showAllBooks = showAllBooks;
+    window.selectAllBooks = selectAllBooks;
+    window.clearSelection = clearSelection;
+    window.openSelectedBooks = openSelectedBooks;
+    window.searchLibrary = searchLibrary;
+    
+    // Save modal functions
+    window.closeSaveLibraryModal = closeSaveLibraryModal;
+    window.handleSaveToLibrary = handleSaveToLibrary;
+    window.createFolderInModal = createFolderInModal;
+    
     // Initialize library on load
+    console.log('📚 Library UI initialized');
     initLibrary();
 `;
 

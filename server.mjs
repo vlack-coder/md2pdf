@@ -997,6 +997,33 @@ console.log(greeting);
       showToast('Saved as tab: ' + title, 'success');
     }
     
+    // Create a new tab with given title and content
+    function createNewTab(title, content) {
+      // Check if a tab with same title already exists
+      const existingTab = tabs.find(t => t.title === title);
+      if (existingTab) {
+        // Switch to existing tab and update content
+        existingTab.content = content;
+        saveTabsToStorage();
+        switchToTab(existingTab.id);
+        return existingTab;
+      }
+      
+      const tab = {
+        id: ++tabIdCounter,
+        title: title.substring(0, 30) + (title.length > 30 ? '...' : ''),
+        content: content,
+        theme: previewTheme,
+        createdAt: new Date().toISOString()
+      };
+      
+      tabs.push(tab);
+      saveTabsToStorage();
+      renderTabs();
+      switchToTab(tab.id);
+      return tab;
+    }
+    
     function renderTabs() {
       const container = document.getElementById('tabs-container');
       const noTabsMessage = document.getElementById('no-tabs-message');
@@ -1341,26 +1368,79 @@ console.log(greeting);
       reader.readAsText(file);
     }
     
-    // Drag and drop
-    markdownInput.addEventListener('dragover', (e) => {
+    // Drag and drop - prevent browser from opening file in new tab
+    let dragCounter = 0;
+    
+    // Document level handlers to prevent browser default (only for external files)
+    document.addEventListener('dragenter', (e) => {
+      // Ignore drags from within the library sidebar
+      if (e.target.closest('.library-sidebar')) return;
+      
       e.preventDefault();
-      dropZone.classList.add('visible');
+      dragCounter++;
+      if (e.dataTransfer.types.includes('Files')) {
+        dropZone.classList.add('visible');
+      }
     });
     
-    markdownInput.addEventListener('dragleave', () => {
-      dropZone.classList.remove('visible');
+    document.addEventListener('dragover', (e) => {
+      // Ignore drags from within the library sidebar
+      if (e.target.closest('.library-sidebar')) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
     });
     
-    markdownInput.addEventListener('drop', (e) => {
+    document.addEventListener('dragleave', (e) => {
+      // Ignore drags from within the library sidebar
+      if (e.target.closest('.library-sidebar')) return;
+      
       e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        dropZone.classList.remove('visible');
+      }
+    });
+    
+    document.addEventListener('drop', (e) => {
+      // Ignore drops within the library sidebar (handled separately)
+      if (e.target.closest('.library-sidebar')) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter = 0;
       dropZone.classList.remove('visible');
       
-      const file = e.dataTransfer.files[0];
-      if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
-        loadFile(file);
-      } else {
-        showToast('Please drop a markdown file (.md)', 'error');
+      const files = Array.from(e.dataTransfer.files).filter(file => 
+        file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt')
+      );
+      
+      if (files.length === 0) {
+        showToast('Please drop markdown files (.md, .markdown, or .txt)', 'error');
+        return;
       }
+      
+      // Load multiple files as tabs
+      files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (index === 0 && tabs.length === 1 && !tabs[0].content.trim()) {
+            // Replace empty first tab
+            tabs[0].name = file.name.replace(/\.(md|markdown|txt)$/, '');
+            tabs[0].content = ev.target.result;
+            renderTabs();
+            switchTab(0);
+          } else {
+            // Create new tab
+            const tabName = file.name.replace(/\.(md|markdown|txt)$/, '');
+            createNewTab(tabName, ev.target.result);
+          }
+        };
+        reader.readAsText(file);
+      });
+      
+      showToast(\`Loaded \${files.length} file\${files.length > 1 ? 's' : ''}\`, 'success');
     });
     
     // Download functions
