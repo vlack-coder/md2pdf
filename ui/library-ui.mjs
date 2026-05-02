@@ -180,6 +180,36 @@ export const libraryStyles = `
       opacity: 0.5;
     }
     
+    .book-actions {
+      display: none;
+      gap: 4px;
+      margin-left: auto;
+    }
+    
+    .book-item:hover .book-actions {
+      display: flex;
+    }
+    
+    .book-action-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    
+    .book-action-btn:hover {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    
+    .book-action-btn.delete:hover {
+      background-color: var(--error);
+      color: #fff;
+    }
+    
     .folder-item.drag-over {
       background-color: rgba(130, 170, 255, 0.3);
       outline: 2px dashed var(--accent);
@@ -1033,11 +1063,16 @@ export const libraryScript = `
       return \`
         <div class="book-item\${isSelected ? ' selected' : ''}" 
              data-book-id="\${book.id}"
-             draggable="true">
+             draggable="true"
+             oncontextmenu="showBookContextMenu(event, '\${book.id}')">
           <input type="checkbox" class="book-checkbox" 
                  \${isSelected ? 'checked' : ''}>
           <span class="book-icon">\${getBookIcon(book.file_type)}</span>
           <span class="book-title">\${escapeHtml(book.title)}</span>
+          <div class="book-actions">
+            <button class="book-action-btn" onclick="event.stopPropagation(); editBookName('\${book.id}')" title="Rename">✏️</button>
+            <button class="book-action-btn delete" onclick="event.stopPropagation(); deleteBook('\${book.id}')" title="Delete">🗑️</button>
+          </div>
         </div>
       \`;
     }
@@ -1048,7 +1083,8 @@ export const libraryScript = `
       
       return \`
         <div class="folder-item\${folder.id === selectedFolderId ? ' active' : ''}" 
-             data-folder-id="\${folder.id}">
+             data-folder-id="\${folder.id}"
+             oncontextmenu="showFolderContextMenu(event, '\${folder.id}')">
           <span class="folder-toggle">\${children.length > 0 ? '▶' : ''}</span>
           <span class="folder-icon">📁</span>
           <span class="folder-name">\${escapeHtml(folder.name)}</span>

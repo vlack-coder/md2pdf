@@ -9,6 +9,10 @@
  * Usage: node server.mjs [--port 3000]
  */
 
+// Load environment variables from .env file
+import { config as loadEnv } from 'dotenv';
+loadEnv();
+
 import { createServer } from 'http';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
@@ -544,14 +548,20 @@ const webUIHtml = `<!DOCTYPE html>
     
     body.fullscreen-mode .main-content .main {
       height: 100%;
+      grid-template-columns: 1fr;
     }
     
     body.fullscreen-mode .main.fullscreen {
       height: 100%;
     }
     
+    body.fullscreen-mode .main.fullscreen .editor-panel {
+      display: none;
+    }
+    
     body.fullscreen-mode .main.fullscreen .preview-panel {
       height: 100%;
+      width: 100%;
     }
     
     body.fullscreen-mode .main.fullscreen .preview-panel .panel-header {
@@ -562,7 +572,288 @@ const webUIHtml = `<!DOCTYPE html>
       height: 100%;
     }
     
+    body.fullscreen-mode .status-bar {
+      display: none !important;
+    }
+    
+    /* Fullscreen sidebar overlay */
+    .fullscreen-sidebar-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      display: none;
+    }
+    
+    .fullscreen-sidebar-overlay.visible {
+      display: block;
+    }
+    
+    .fullscreen-sidebar {
+      position: fixed;
+      top: 0;
+      left: -320px;
+      width: 320px;
+      height: 100vh;
+      background-color: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      z-index: 2001;
+      transition: left 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .fullscreen-sidebar-overlay.visible .fullscreen-sidebar {
+      left: 0;
+    }
+    
+    .fullscreen-sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .fullscreen-sidebar-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .fullscreen-sidebar-actions {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .fullscreen-sidebar-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    
+    .fullscreen-sidebar-close:hover {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+    
+    .fullscreen-sidebar-search {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .fullscreen-sidebar-search input {
+      width: 100%;
+      padding: 8px 12px;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+    
+    .fullscreen-sidebar-search input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    .fullscreen-sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+    
+    .fullscreen-sidebar-section {
+      padding: 0 12px;
+      margin-bottom: 16px;
+    }
+    
+    .fullscreen-sidebar-section-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .fs-folder-item, .fs-book-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    
+    .fs-folder-item:hover, .fs-book-item:hover {
+      background-color: var(--bg-tertiary);
+    }
+    
+    .fs-folder-item.active {
+      background-color: rgba(130, 170, 255, 0.15);
+      border-left: 2px solid var(--accent);
+    }
+    
+    .fs-book-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .fs-book-actions {
+      display: none;
+      gap: 4px;
+    }
+    
+    .fs-book-item:hover .fs-book-actions {
+      display: flex;
+    }
+    
+    .fs-action-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    .fs-action-btn:hover {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    
+    .fs-action-btn.delete:hover {
+      background-color: var(--error);
+      color: #fff;
+    }
+    
+    .fullscreen-sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .fullscreen-sidebar-footer-btn {
+      padding: 10px 14px;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    
+    .fullscreen-sidebar-footer-btn:hover {
+      background-color: var(--bg-primary);
+      border-color: var(--accent);
+    }
+    
+    .fs-empty-state {
+      padding: 20px 16px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 0;
+      min-width: 160px;
+      z-index: 3000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      display: none;
+    }
+    
+    .context-menu.visible {
+      display: block;
+    }
+    
+    .context-menu-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+      font-size: 13px;
+      transition: background-color 0.15s;
+    }
+    
+    .context-menu-item:hover {
+      background-color: var(--bg-tertiary);
+    }
+    
+    .context-menu-item.danger {
+      color: var(--error);
+    }
+    
+    .context-menu-item.danger:hover {
+      background-color: rgba(239, 83, 80, 0.15);
+    }
+    
+    .context-menu-divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 6px 0;
+    }
+    
     /* Floating controls in fullscreen */
+    .fullscreen-floating-controls-left {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      display: none;
+      z-index: 1000;
+      padding: 8px;
+      background-color: rgba(1, 22, 39, 0.8);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    body.fullscreen-mode .fullscreen-floating-controls-left {
+      display: flex;
+    }
+    
+    body.fullscreen-mode.has-tabs .fullscreen-floating-controls-left {
+      top: 65px;
+    }
+    
+    .fullscreen-floating-controls-left .btn {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
     .fullscreen-floating-controls {
       position: fixed;
       top: 16px;
@@ -596,9 +887,22 @@ const webUIHtml = `<!DOCTYPE html>
     }
     
     .fullscreen-floating-controls .theme-dropdown {
+      position: absolute;
       top: 100%;
       right: 0;
-      margin-top: 4px;
+      margin-top: 8px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 220px;
+      z-index: 1001;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .fullscreen-floating-controls .theme-dropdown.visible {
+      display: block;
     }
     
     /* Tab System */
@@ -970,15 +1274,97 @@ console.log(greeting);
     <button class="sidebar-toggle" onclick="openLibrarySidebar()" title="Open Library">📚</button>
   </div><!-- End app-container -->
   
+  <!-- Fullscreen sidebar overlay -->
+  <div class="fullscreen-sidebar-overlay" id="fullscreen-sidebar-overlay" onclick="closeFullscreenSidebar(event)">
+    <div class="fullscreen-sidebar" onclick="event.stopPropagation()">
+      <div class="fullscreen-sidebar-header">
+        <h3>📚 Library</h3>
+        <div class="fullscreen-sidebar-actions">
+          <button class="fullscreen-sidebar-close" onclick="refreshFullscreenLibrary()" title="Refresh">🔄</button>
+          <button class="fullscreen-sidebar-close" onclick="closeFullscreenSidebar()">&times;</button>
+        </div>
+      </div>
+      
+      <div class="fullscreen-sidebar-search">
+        <input type="text" id="fs-library-search" placeholder="🔍 Search books..." oninput="searchFullscreenLibrary(this.value)">
+      </div>
+      
+      <div class="fullscreen-sidebar-content">
+        <div class="fullscreen-sidebar-section" id="fs-folders-section">
+          <div class="fullscreen-sidebar-section-header">
+            <span>Folders</span>
+          </div>
+          <div id="fs-folders-list"></div>
+        </div>
+        
+        <div class="fullscreen-sidebar-section" id="fs-books-section">
+          <div class="fullscreen-sidebar-section-header">
+            <span id="fs-books-title">All Books</span>
+          </div>
+          <div id="fs-books-list">
+            <div class="fs-empty-state">Loading...</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="fullscreen-sidebar-footer">
+        <button class="fullscreen-sidebar-footer-btn" onclick="closeFullscreenSidebar(); toggleFullscreen();">
+          ✏️ Exit to Editor
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Context Menu -->
+  <div class="context-menu" id="context-menu">
+    <div class="context-menu-item" onclick="contextMenuAction('open')">📂 Open</div>
+    <div class="context-menu-item" onclick="contextMenuAction('rename')">✏️ Rename</div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" onclick="contextMenuAction('delete')">🗑️ Delete</div>
+  </div>
+  
   <!-- Floating controls for fullscreen mode -->
+  <div class="fullscreen-floating-controls-left" id="fullscreen-floating-controls-left">
+    <button class="btn btn-secondary btn-icon" onclick="openFullscreenSidebar()" title="Quick Menu">
+      📚
+    </button>
+  </div>
+  
   <div class="fullscreen-floating-controls" id="fullscreen-floating-controls">
     <button class="btn btn-secondary btn-icon" onclick="toggleFullscreen()" id="fullscreen-btn-floating" title="Exit fullscreen">
       ⛶
     </button>
     <div class="theme-dropdown-wrapper">
-      <button class="btn btn-secondary btn-icon" onclick="toggleThemeDropdown()" title="Toggle preview theme">
+      <button class="btn btn-secondary btn-icon" onclick="toggleFullscreenThemeDropdown(event)" id="fullscreen-theme-btn" title="Toggle preview theme">
         🌙
       </button>
+      <div class="theme-dropdown" id="fullscreen-theme-dropdown">
+        <h4>☀️ Light Mode</h4>
+        <button class="theme-option" data-theme="light" onclick="setPreviewTheme('light'); closeFullscreenThemeDropdown();">
+          <span class="theme-swatch" style="background-color: #ffffff;"></span>
+          <span>Light</span>
+        </button>
+        
+        <div class="theme-divider"></div>
+        <h4>🌙 Dark Mode Variants</h4>
+        
+        <button class="theme-option" data-theme="dark" data-variant="night-owl" onclick="setPreviewTheme('dark', 'night-owl'); closeFullscreenThemeDropdown();">
+          <span class="theme-swatch" style="background-color: #011627;"></span>
+          <span>Night Owl</span>
+        </button>
+        <button class="theme-option" data-theme="dark" data-variant="pure-dark" onclick="setPreviewTheme('dark', 'pure-dark'); closeFullscreenThemeDropdown();">
+          <span class="theme-swatch" style="background-color: #0f0f0f;"></span>
+          <span>Pure Dark</span>
+        </button>
+        <button class="theme-option" data-theme="dark" data-variant="material-dark" onclick="setPreviewTheme('dark', 'material-dark'); closeFullscreenThemeDropdown();">
+          <span class="theme-swatch" style="background-color: #202124;"></span>
+          <span>Material Dark</span>
+        </button>
+        <button class="theme-option" data-theme="dark" data-variant="custom" onclick="setPreviewTheme('dark', 'custom'); closeFullscreenThemeDropdown();">
+          <span class="theme-swatch" style="background-color: #1a1a2e;"></span>
+          <span>Custom</span>
+        </button>
+      </div>
     </div>
   </div>
   
@@ -1072,6 +1458,355 @@ console.log(greeting);
         }
       }
     }
+    
+    // Fullscreen sidebar library data
+    let fsLibraryFolders = [];
+    let fsLibraryBooks = [];
+    let fsSelectedFolderId = null;
+    let contextMenuTarget = null;
+    
+    // Fullscreen sidebar functions
+    function openFullscreenSidebar() {
+      document.getElementById('fullscreen-sidebar-overlay').classList.add('visible');
+      refreshFullscreenLibrary();
+    }
+    
+    function closeFullscreenSidebar(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('fullscreen-sidebar-overlay').classList.remove('visible');
+      hideContextMenu();
+    }
+    
+    async function refreshFullscreenLibrary() {
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      
+      try {
+        const [foldersRes, booksRes] = await Promise.all([
+          fetch('/api/folders', { headers }),
+          fetch('/api/books', { headers })
+        ]);
+        
+        const foldersData = await foldersRes.json();
+        const booksData = await booksRes.json();
+        
+        fsLibraryFolders = foldersData.folders || [];
+        fsLibraryBooks = booksData.books || [];
+        
+        renderFullscreenLibrary();
+      } catch (err) {
+        console.error('Failed to load library:', err);
+      }
+    }
+    
+    function renderFullscreenLibrary() {
+      const foldersSection = document.getElementById('fs-folders-section');
+      const foldersList = document.getElementById('fs-folders-list');
+      const booksList = document.getElementById('fs-books-list');
+      const booksTitle = document.getElementById('fs-books-title');
+      
+      // Render folders
+      if (fsLibraryFolders.length > 0) {
+        foldersSection.style.display = 'block';
+        const rootFolders = fsLibraryFolders.filter(f => !f.parent_id);
+        foldersList.innerHTML = rootFolders.map(f => renderFsFolder(f)).join('');
+      } else {
+        foldersSection.style.display = 'none';
+      }
+      
+      // Render books
+      const booksToShow = fsSelectedFolderId 
+        ? fsLibraryBooks.filter(b => b.folder_id === fsSelectedFolderId)
+        : fsLibraryBooks;
+      
+      if (fsSelectedFolderId) {
+        const folder = fsLibraryFolders.find(f => f.id === fsSelectedFolderId);
+        booksTitle.textContent = folder ? '📁 ' + folder.name : 'All Books';
+      } else {
+        booksTitle.textContent = 'All Books';
+      }
+      
+      if (booksToShow.length > 0) {
+        booksList.innerHTML = booksToShow.map(b => renderFsBook(b)).join('');
+      } else {
+        booksList.innerHTML = '<div class="fs-empty-state">No books found</div>';
+      }
+    }
+    
+    function renderFsFolder(folder) {
+      const isActive = folder.id === fsSelectedFolderId;
+      return \`
+        <div class="fs-folder-item\${isActive ? ' active' : ''}" 
+             data-folder-id="\${folder.id}"
+             onclick="selectFsFolder('\${folder.id}')"
+             oncontextmenu="showFolderContextMenu(event, '\${folder.id}')">
+          <span>📁</span>
+          <span class="fs-book-title">\${escapeHtml(folder.name)}</span>
+        </div>
+      \`;
+    }
+    
+    function renderFsBook(book) {
+      const icon = book.file_type === 'pdf' ? '📕' : book.file_type === 'html' ? '📄' : '📝';
+      return \`
+        <div class="fs-book-item" 
+             data-book-id="\${book.id}"
+             onclick="openFsBook('\${book.id}')"
+             oncontextmenu="showBookContextMenu(event, '\${book.id}')">
+          <span>\${icon}</span>
+          <span class="fs-book-title">\${escapeHtml(book.title)}</span>
+          <div class="fs-book-actions">
+            <button class="fs-action-btn" onclick="event.stopPropagation(); editBookName('\${book.id}')" title="Rename">✏️</button>
+            <button class="fs-action-btn delete" onclick="event.stopPropagation(); deleteBook('\${book.id}')" title="Delete">🗑️</button>
+          </div>
+        </div>
+      \`;
+    }
+    
+    function selectFsFolder(folderId) {
+      fsSelectedFolderId = fsSelectedFolderId === folderId ? null : folderId;
+      renderFullscreenLibrary();
+    }
+    
+    async function openFsBook(bookId) {
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      
+      try {
+        const res = await fetch('/api/books/' + bookId, { headers });
+        const data = await res.json();
+        
+        if (data.book && data.book.content) {
+          // Close sidebar and exit fullscreen to show editor
+          closeFullscreenSidebar();
+          toggleFullscreen();
+          
+          // Load content
+          markdownInput.value = data.book.content;
+          updateCharCount();
+          renderPreview();
+          showToast('Loaded: ' + data.book.title, 'success');
+        }
+      } catch (err) {
+        showToast('Failed to load book', 'error');
+      }
+    }
+    
+    function searchFullscreenLibrary(query) {
+      query = query.toLowerCase().trim();
+      const bookItems = document.querySelectorAll('.fs-book-item');
+      
+      bookItems.forEach(item => {
+        const title = item.querySelector('.fs-book-title').textContent.toLowerCase();
+        item.style.display = title.includes(query) ? 'flex' : 'none';
+      });
+    }
+    
+    // Context menu functions
+    function showBookContextMenu(event, bookId) {
+      event.preventDefault();
+      event.stopPropagation();
+      contextMenuTarget = { type: 'book', id: bookId };
+      showContextMenu(event.clientX, event.clientY);
+    }
+    
+    function showFolderContextMenu(event, folderId) {
+      event.preventDefault();
+      event.stopPropagation();
+      contextMenuTarget = { type: 'folder', id: folderId };
+      showContextMenu(event.clientX, event.clientY);
+    }
+    
+    function showContextMenu(x, y) {
+      const menu = document.getElementById('context-menu');
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      menu.classList.add('visible');
+    }
+    
+    function hideContextMenu() {
+      document.getElementById('context-menu').classList.remove('visible');
+      contextMenuTarget = null;
+    }
+    
+    document.addEventListener('click', hideContextMenu);
+    
+    async function contextMenuAction(action) {
+      if (!contextMenuTarget) return;
+      
+      const { type, id } = contextMenuTarget;
+      hideContextMenu();
+      
+      if (action === 'open') {
+        if (type === 'book') {
+          openFsBook(id);
+        } else if (type === 'folder') {
+          selectFsFolder(id);
+        }
+      } else if (action === 'rename') {
+        if (type === 'book') {
+          editBookName(id);
+        } else if (type === 'folder') {
+          editFolderName(id);
+        }
+      } else if (action === 'delete') {
+        if (type === 'book') {
+          deleteBook(id);
+        } else if (type === 'folder') {
+          deleteFolder(id);
+        }
+      }
+    }
+    
+    async function editBookName(bookId) {
+      const book = fsLibraryBooks.find(b => b.id === bookId) || libraryBooks.find(b => b.id === bookId);
+      if (!book) return;
+      
+      const newName = prompt('Enter new name:', book.title);
+      if (!newName || newName === book.title) return;
+      
+      const token = localStorage.getItem('auth_token');
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': 'Bearer ' + token })
+      };
+      
+      try {
+        const res = await fetch('/api/books/' + bookId, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ title: newName })
+        });
+        
+        if (res.ok) {
+          showToast('Book renamed', 'success');
+          refreshFullscreenLibrary();
+          refreshLibrary();
+        } else {
+          showToast('Failed to rename book', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to rename book', 'error');
+      }
+    }
+    
+    async function deleteBook(bookId) {
+      if (!confirm('Delete this book? This cannot be undone.')) return;
+      
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      
+      try {
+        const res = await fetch('/api/books/' + bookId, {
+          method: 'DELETE',
+          headers
+        });
+        
+        if (res.ok) {
+          showToast('Book deleted', 'success');
+          refreshFullscreenLibrary();
+          refreshLibrary();
+        } else {
+          showToast('Failed to delete book', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to delete book', 'error');
+      }
+    }
+    
+    async function editFolderName(folderId) {
+      const folder = fsLibraryFolders.find(f => f.id === folderId);
+      if (!folder) return;
+      
+      const newName = prompt('Enter new folder name:', folder.name);
+      if (!newName || newName === folder.name) return;
+      
+      const token = localStorage.getItem('auth_token');
+      const headers = { 
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': 'Bearer ' + token })
+      };
+      
+      try {
+        const res = await fetch('/api/folders/' + folderId, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ name: newName })
+        });
+        
+        if (res.ok) {
+          showToast('Folder renamed', 'success');
+          refreshFullscreenLibrary();
+          refreshLibrary();
+        } else {
+          showToast('Failed to rename folder', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to rename folder', 'error');
+      }
+    }
+    
+    async function deleteFolder(folderId) {
+      if (!confirm('Delete this folder? Books inside will be moved to root.')) return;
+      
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      
+      try {
+        const res = await fetch('/api/folders/' + folderId, {
+          method: 'DELETE',
+          headers
+        });
+        
+        if (res.ok) {
+          showToast('Folder deleted', 'success');
+          fsSelectedFolderId = null;
+          refreshFullscreenLibrary();
+          refreshLibrary();
+        } else {
+          showToast('Failed to delete folder', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to delete folder', 'error');
+      }
+    }
+    
+    function exitFullscreenAndOpenLibrary() {
+      closeFullscreenSidebar();
+      toggleFullscreen();
+      openLibrarySidebar();
+    }
+    
+    // Fullscreen theme dropdown functions
+    function toggleFullscreenThemeDropdown(event) {
+      event.stopPropagation();
+      const dropdown = document.getElementById('fullscreen-theme-dropdown');
+      dropdown.classList.toggle('visible');
+      updateFullscreenThemeOptions();
+    }
+    
+    function closeFullscreenThemeDropdown() {
+      document.getElementById('fullscreen-theme-dropdown').classList.remove('visible');
+    }
+    
+    function updateFullscreenThemeOptions() {
+      document.querySelectorAll('#fullscreen-theme-dropdown .theme-option').forEach(opt => {
+        const isActive = opt.dataset.theme === previewTheme && 
+          (previewTheme === 'light' || opt.dataset.variant === previewDarkVariant);
+        opt.classList.toggle('active', isActive);
+      });
+    }
+    
+    // Close fullscreen theme dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('fullscreen-theme-dropdown');
+      if (dropdown && dropdown.classList.contains('visible')) {
+        const wrapper = e.target.closest('.fullscreen-floating-controls .theme-dropdown-wrapper');
+        if (!wrapper) {
+          dropdown.classList.remove('visible');
+        }
+      }
+    });
     
     // Tab Management Functions
     function saveAsTab() {
