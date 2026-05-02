@@ -2,7 +2,7 @@
 
 ## Overview
 
-**md2pdf** is a self-contained markdown-to-PDF/HTML converter with a web-based editor interface. The project focuses on providing a beautiful, user-friendly experience for writing and exporting markdown documents.
+**md2pdf** is an E-Library system with markdown-to-PDF/HTML conversion, featuring a web-based editor interface, folder-based book organization, and multi-provider storage support (Supabase, local filesystem).
 
 ---
 
@@ -40,6 +40,16 @@
 - [x] Health check endpoint
 - [x] Configurable port via environment/args
 
+### E-Library System (v2.0)
+- [x] Folder/topic hierarchy for organizing books
+- [x] Book metadata management
+- [x] REST API for library operations
+- [x] Multi-provider adapter pattern
+- [x] Supabase adapter (PostgreSQL + Storage)
+- [x] Local adapter (JSON + Filesystem)
+- [x] Configuration via environment variables
+- [x] File upload/download support
+
 ---
 
 ## Out of Scope
@@ -48,10 +58,7 @@ The following features are **not planned** for this project:
 
 ### Collaboration & Cloud
 - [ ] Real-time collaborative editing
-- [ ] User authentication/accounts
-- [ ] Cloud storage integration (Google Drive, Dropbox, etc.)
 - [ ] Document sharing via links
-- [ ] Server-side document storage
 
 ### Advanced Editor Features
 - [ ] WYSIWYG editing mode
@@ -78,25 +85,27 @@ The following features are **not planned** for this project:
 - [ ] Password-protected PDFs
 - [ ] Digital signatures
 
-### Infrastructure
-- [ ] Multi-user server deployment
-- [ ] Database persistence
-- [ ] File upload to server
-- [ ] API rate limiting
-- [ ] Analytics/telemetry
-
 ---
 
 ## Future Considerations
 
-These items may be considered for future versions but are not currently committed:
+These items may be considered for future versions:
 
+### Planned for Next Release
+- [ ] User authentication/accounts (auth adapter ready)
+- [ ] Multi-user support with private libraries
+- [ ] Row-level security for user data
+
+### Under Consideration
 - Custom CSS injection for previews
 - Template system for PDF output
 - Print-optimized styles
 - Mobile-responsive editor improvements
 - Offline PWA support
 - Plugin/extension system
+- Firebase adapter
+- MongoDB adapter
+- S3/R2 storage adapter
 
 ---
 

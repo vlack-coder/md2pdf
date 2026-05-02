@@ -1,21 +1,36 @@
 #!/usr/bin/env node
 
 /**
- * md2pdf Web UI Server
+ * md2pdf E-Library Server
  * 
  * A web interface for converting Markdown to HTML/PDF
- * with Night Owl theme and dark mode support.
+ * with Night Owl theme, dark mode support, and library management.
  * 
  * Usage: node server.mjs [--port 3000]
  */
 
 import { createServer } from 'http';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import puppeteer from 'puppeteer';
+
+// Library system imports
+import { loadConfig, getAdapterConfig } from './config/index.mjs';
+import { initializeAdapters, getAdapterManager } from './adapters/index.mjs';
+import { createLibraryRoutes } from './routes/library.mjs';
+import { createAuthRoutes } from './routes/auth.mjs';
+import { 
+  libraryStyles, 
+  librarySidebarHtml, 
+  authModalHtml, 
+  saveLibraryModalHtml,
+  authButtonsHtml,
+  userMenuHtml,
+  libraryScript 
+} from './ui/library-ui.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -721,12 +736,17 @@ const webUIHtml = `<!DOCTYPE html>
       outline: none;
       border-color: var(--accent);
     }
+    
+    ${libraryStyles}
   </style>
 </head>
 <body>
   <!-- Header -->
   <header class="header">
     <div class="logo">
+      <button class="btn btn-secondary library-toggle-btn" onclick="toggleLibrarySidebar()" title="Toggle Library">
+        📚 <span class="btn-text">Library</span>
+      </button>
       <span class="logo-icon">📝</span>
       <h1>md<span>2</span>pdf</h1>
     </div>
@@ -740,9 +760,15 @@ const webUIHtml = `<!DOCTYPE html>
       <button class="btn btn-secondary" onclick="clearEditor()">
         🗑️ Clear
       </button>
+      <button class="btn btn-secondary" onclick="saveToLibrary()" title="Save to library">
+        💾 Save to Library
+      </button>
       <button class="btn btn-primary save-tab-btn" onclick="saveAsTab()" title="Save current document as a tab">
         📑 Save Tab
       </button>
+      
+      ${authButtonsHtml}
+      ${userMenuHtml}
     </div>
   </header>
   
@@ -751,24 +777,29 @@ const webUIHtml = `<!DOCTYPE html>
     <span class="no-tabs-message" id="no-tabs-message">No saved tabs yet. Click "Save Tab" to save the current document.</span>
   </div>
   
-  <!-- Main Content -->
-  <main class="main">
-    <!-- Editor Panel -->
-    <div class="editor-panel">
-      <div class="panel-header">
-        <span class="panel-title">📝 Markdown Editor</span>
-        <div class="toolbar">
-          <button class="toolbar-btn" onclick="insertText('**', '**')" title="Bold">B</button>
-          <button class="toolbar-btn" onclick="insertText('*', '*')" title="Italic"><i>I</i></button>
-          <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block">&lt;/&gt;</button>
-          <button class="toolbar-btn" onclick="insertText('[', '](url)')" title="Link">🔗</button>
-          <button class="toolbar-btn" onclick="insertListItem()" title="List">•</button>
-        </div>
-      </div>
-      <div class="editor-container">
-        <textarea 
-          id="markdown-input" 
-          placeholder="# Start typing your markdown here...
+  <!-- App Container with Library Sidebar -->
+  <div class="app-container">
+    ${librarySidebarHtml}
+    
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <main class="main">
+        <!-- Editor Panel -->
+        <div class="editor-panel">
+          <div class="panel-header">
+            <span class="panel-title">📝 Markdown Editor</span>
+            <div class="toolbar">
+              <button class="toolbar-btn" onclick="insertText('**', '**')" title="Bold">B</button>
+              <button class="toolbar-btn" onclick="insertText('*', '*')" title="Italic"><i>I</i></button>
+              <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block">&lt;/&gt;</button>
+              <button class="toolbar-btn" onclick="insertText('[', '](url)')" title="Link">🔗</button>
+              <button class="toolbar-btn" onclick="insertListItem()" title="List">•</button>
+            </div>
+          </div>
+          <div class="editor-container">
+            <textarea 
+              id="markdown-input" 
+              placeholder="# Start typing your markdown here...
 
 Or drag & drop a .md file
 
@@ -853,6 +884,11 @@ console.log(greeting);
       </div>
     </div>
   </main>
+    </div><!-- End main-content -->
+    
+    <!-- Sidebar Toggle (visible when collapsed) -->
+    <button class="sidebar-toggle" onclick="openLibrarySidebar()" title="Open Library">📚</button>
+  </div><!-- End app-container -->
   
   <!-- Toast -->
   <div class="toast" id="toast">
@@ -871,6 +907,9 @@ console.log(greeting);
       </div>
     </div>
   </div>
+  
+  ${authModalHtml}
+  ${saveLibraryModalHtml}
   
   <script>
     const markdownInput = document.getElementById('markdown-input');
@@ -1504,6 +1543,8 @@ console.log(greeting);
     initCustomColor();
     loadTabsFromStorage();
     renderPreview();
+    
+    ${libraryScript}
   </script>
 </body>
 </html>`;
@@ -1602,13 +1643,61 @@ const server = createServer(async (req, res) => {
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
+  }
+  
+  // Library API routes (/api/folders, /api/books, etc.)
+  if (url.pathname.startsWith('/api/folders') || 
+      url.pathname.startsWith('/api/books') || 
+      url.pathname.startsWith('/api/stats') ||
+      url.pathname.startsWith('/api/upload')) {
+    const adapters = getAdapterManager();
+    if (!adapters.initialized) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Library system not initialized' }));
+      return;
+    }
+    
+    const libraryHandler = createLibraryRoutes(adapters);
+    const handled = await libraryHandler(req, res, url.pathname + url.search);
+    if (handled !== null) return;
+  }
+  
+  // Auth API routes (/api/auth/*)
+  if (url.pathname.startsWith('/api/auth/')) {
+    const adapters = getAdapterManager();
+    const authHandler = createAuthRoutes(adapters);
+    const handled = await authHandler(req, res, url.pathname);
+    if (handled !== null) return;
+  }
+  
+  // Serve files from local storage
+  if (url.pathname.startsWith('/files/')) {
+    const adapters = getAdapterManager();
+    if (adapters.initialized && adapters.getProvider() === 'local') {
+      const filePath = url.pathname.replace('/files/', '');
+      try {
+        const buffer = await adapters.storage.download(filePath);
+        const metadata = await adapters.storage.getMetadata(filePath);
+        
+        res.writeHead(200, {
+          'Content-Type': metadata?.mimeType || 'application/octet-stream',
+          'Content-Length': buffer.length
+        });
+        res.end(buffer);
+        return;
+      } catch (e) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+        return;
+      }
+    }
   }
   
   // Routes
@@ -1709,10 +1798,21 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
+  // Initialize library system adapters
+  try {
+    const config = loadConfig();
+    const adapterConfig = getAdapterConfig(config);
+    await initializeAdapters(adapterConfig);
+    console.log(`📚 Library system initialized (${adapterConfig.provider} adapter)`);
+  } catch (e) {
+    console.warn('⚠️  Library system initialization failed:', e.message);
+    console.warn('   Markdown conversion will work, but library features are disabled.');
+  }
+  
   console.log(`
 ╔════════════════════════════════════════════════╗
-║           md2pdf Web UI Server                  ║
+║        md2pdf E-Library Server                  ║
 ╚════════════════════════════════════════════════╝
 
 🌐 Server running at: http://localhost:${PORT}
@@ -1723,15 +1823,24 @@ Features:
   • Dark mode with theme presets
   • Download as HTML or PDF
   • Drag & drop file support
+  • 📚 Library management (folders & books)
 
 Press Ctrl+C to stop the server
 `);
 });
 
-// Graceful shutdown - close shared browser
+// Graceful shutdown - close shared browser and adapters
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
     console.log('\\nShutting down...');
+    
+    // Close adapter connections
+    const adapters = getAdapterManager();
+    if (adapters.initialized) {
+      await adapters.close().catch(() => {});
+    }
+    
+    // Close browser
     if (browserInstance) {
       await browserInstance.close().catch(() => {});
     }

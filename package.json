@@ -1,7 +1,7 @@
 {
   "name": "md2pdf",
-  "version": "1.0.0",
-  "description": "Convert markdown files to PDF/HTML with Night Owl theme and dark mode support",
+  "version": "2.1.0",
+  "description": "E-Library with markdown-to-PDF/HTML converter, Night Owl theme, and multi-provider storage support",
   "type": "module",
   "bin": {
     "md2pdf": "./md2pdf"
@@ -9,7 +9,8 @@
   "scripts": {
     "convert": "node convert-to-pdf.mjs",
     "serve": "node server.mjs",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "keywords": [
     "markdown",
@@ -17,11 +18,14 @@
     "converter",
     "night-owl",
     "dark-mode",
-    "syntax-highlighting"
+    "syntax-highlighting",
+    "e-library",
+    "supabase"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "glob": "^10.5.0",
     "highlight.js": "^11.9.0",
     "marked": "^12.0.0",

@@ -1,0 +1,13 @@
+{
+  "provider": "local",
+  "authEnabled": false,
+  "storageBucket": "library",
+  "local": {
+    "dataDir": "./data",
+    "storageDir": "./storage"
+  },
+  "supabase": {
+    "url": null,
+    "key": null
+  }
+}
