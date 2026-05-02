@@ -1671,6 +1671,19 @@ console.log(greeting);
     
     async function openFsBook(bookId) {
       console.log('openFsBook called with:', bookId);
+      
+      // Check if this book is already open in a tab - switch to it instead
+      const existingTab = tabs.find(t => t.bookId === bookId);
+      if (existingTab) {
+        switchToTab(existingTab.id);
+        currentBookId = bookId;
+        
+        // Render to fullscreen preview
+        await renderToFullscreenPreview(existingTab.content);
+        showToast('Switched to: ' + existingTab.title, 'success');
+        return;
+      }
+      
       const token = localStorage.getItem('auth_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       
@@ -1683,45 +1696,11 @@ console.log(greeting);
         const content = data.book?.content || data.book?.metadata?.content;
         
         if (data.book && content) {
-          // Track which book we're viewing for Supabase sync
-          currentBookId = bookId;
+          // Create a tab for this book (will check for duplicates internally)
+          createNewTab(data.book.title, content, bookId);
           
-          // Load content into editor (for when we exit fullscreen later)
-          markdownInput.value = content;
-          updateCharCount();
-          
-          // Render directly to the fullscreen preview iframe
-          const fsPreviewFrame = document.getElementById('fs-preview-frame');
-          console.log('Preview frame:', fsPreviewFrame);
-          
-          if (fsPreviewFrame) {
-            const response = await fetch('/api/render', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ markdown: content })
-            });
-            
-            const html = await response.text();
-            const doc = fsPreviewFrame.contentDocument;
-            doc.open();
-            doc.write(html);
-            doc.close();
-            
-            // Apply theme
-            setTimeout(() => {
-              if (doc && doc.documentElement) {
-                doc.documentElement.setAttribute('data-theme', previewTheme);
-                if (previewTheme === 'dark') {
-                  doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
-                }
-                const controls = doc.querySelector('.theme-controls');
-                if (controls) controls.style.display = 'none';
-              }
-            }, 50);
-          }
-          
-          // Also update the main preview
-          renderPreview();
+          // Render to fullscreen preview
+          await renderToFullscreenPreview(content);
           
           showToast('Loaded: ' + data.book.title, 'success');
         } else {
@@ -1731,6 +1710,40 @@ console.log(greeting);
       } catch (err) {
         console.error('Error loading book:', err);
         showToast('Failed to load book', 'error');
+      }
+    }
+    
+    // Helper to render content to fullscreen preview iframe
+    async function renderToFullscreenPreview(content) {
+      const fsPreviewFrame = document.getElementById('fs-preview-frame');
+      if (!fsPreviewFrame) return;
+      
+      try {
+        const response = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ markdown: content })
+        });
+        
+        const html = await response.text();
+        const doc = fsPreviewFrame.contentDocument;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        
+        // Apply theme
+        setTimeout(() => {
+          if (doc && doc.documentElement) {
+            doc.documentElement.setAttribute('data-theme', previewTheme);
+            if (previewTheme === 'dark') {
+              doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+            }
+            const controls = doc.querySelector('.theme-controls');
+            if (controls) controls.style.display = 'none';
+          }
+        }, 50);
+      } catch (err) {
+        console.error('Error rendering to fullscreen preview:', err);
       }
     }
     
@@ -2029,11 +2042,19 @@ console.log(greeting);
       let title = titleMatch ? titleMatch[1].substring(0, 30) : 'Untitled';
       if (titleMatch && titleMatch[1].length > 30) title += '...';
       
-      // Check for existing tab with same title
-      const existingTab = tabs.find(t => t.title === title);
+      // Check for existing tab - prioritize bookId, then title
+      let existingTab = null;
+      if (currentBookId) {
+        existingTab = tabs.find(t => t.bookId === currentBookId);
+      }
+      if (!existingTab) {
+        existingTab = tabs.find(t => t.title === title);
+      }
+      
       if (existingTab) {
         // Update existing tab
         existingTab.content = content;
+        existingTab.title = title; // Update title in case it changed
         existingTab.theme = previewTheme;
         existingTab.bookId = currentBookId;
         saveTabsToStorage();
@@ -2093,14 +2114,23 @@ console.log(greeting);
     
     // Create a new tab with given title and content
     function createNewTab(title, content, bookId = null) {
-      // Check if a tab with same title already exists
-      const existingTab = tabs.find(t => t.title === title || (bookId && t.bookId === bookId));
+      // Check if a tab already exists - prioritize bookId match
+      let existingTab = null;
+      if (bookId) {
+        existingTab = tabs.find(t => t.bookId === bookId);
+      }
+      if (!existingTab) {
+        existingTab = tabs.find(t => t.title === title);
+      }
+      
       if (existingTab) {
         // Switch to existing tab and update content
         existingTab.content = content;
+        existingTab.title = title.substring(0, 30) + (title.length > 30 ? '...' : '');
         existingTab.bookId = bookId;
         currentBookId = bookId;
         saveTabsToStorage();
+        renderTabs();
         switchToTab(existingTab.id);
         return existingTab;
       }
@@ -2186,6 +2216,12 @@ console.log(greeting);
       const index = tabs.findIndex(t => t.id === tabId);
       if (index === -1) return;
       
+      // Check if closing tab was linked to currentBookId
+      const closingTab = tabs[index];
+      if (closingTab.bookId === currentBookId) {
+        currentBookId = null;
+      }
+      
       tabs.splice(index, 1);
       saveTabsToStorage();
       
@@ -2196,6 +2232,7 @@ console.log(greeting);
           switchToTab(tabs[newIndex].id);
         } else {
           activeTabId = null;
+          currentBookId = null;
           newTab();
         }
       }
@@ -2206,6 +2243,7 @@ console.log(greeting);
     
     function newTab() {
       activeTabId = null;
+      currentBookId = null;
       markdownInput.value = '';
       updateCharCount();
       renderPreview();

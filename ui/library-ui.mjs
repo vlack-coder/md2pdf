@@ -1221,7 +1221,7 @@ export const libraryScript = `
         
         // Create a new tab for this book (or switch to existing)
         if (typeof createNewTab === 'function') {
-          createNewTab(book.title, content);
+          createNewTab(book.title, content, bookId);
         } else {
           // Fallback: just load into editor
           document.getElementById('markdown-input').value = content;
@@ -1398,37 +1398,88 @@ export const libraryScript = `
       };
       
       try {
-        // First upload the file content
-        const filename = title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.md';
-        const filePath = folderId ? folderId + '/' + filename : filename;
+        let bookId = null;
+        let isUpdate = false;
         
-        // Upload content to storage (simplified - storing as metadata for now)
-        // In production, you'd upload to actual storage
+        // Check if we're editing an existing book (currentBookId is set)
+        if (typeof currentBookId !== 'undefined' && currentBookId) {
+          bookId = currentBookId;
+          isUpdate = true;
+        }
         
-        // Create book record
-        const res = await fetch('/api/books', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            title,
-            folder_id: folderId,
-            file_type: 'md',
-            file_size: new Blob([content]).size,
-            metadata: { content } // Store content in metadata for simple implementation
-          })
-        });
+        // If not editing existing, check if a book with same title already exists
+        if (!isUpdate) {
+          const checkRes = await fetch('/api/books', { headers });
+          const checkData = await checkRes.json();
+          const existingBook = (checkData.books || []).find(b => 
+            b.title.toLowerCase() === title.toLowerCase()
+          );
+          if (existingBook) {
+            bookId = existingBook.id;
+            isUpdate = true;
+          }
+        }
+        
+        let res;
+        if (isUpdate && bookId) {
+          // Update existing book
+          res = await fetch('/api/books/' + bookId, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+              title,
+              folder_id: folderId,
+              file_size: new Blob([content]).size,
+              metadata: { content }
+            })
+          });
+        } else {
+          // Create new book
+          res = await fetch('/api/books', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title,
+              folder_id: folderId,
+              file_type: 'md',
+              file_size: new Blob([content]).size,
+              metadata: { content }
+            })
+          });
+        }
         
         const data = await res.json();
         
         if (data.book) {
+          // Link this book to current tab and track it
+          const newBookId = data.book.id;
+          if (typeof currentBookId !== 'undefined') {
+            currentBookId = newBookId;
+          }
+          
+          // Update current tab's bookId if tabs exist
+          if (typeof tabs !== 'undefined' && typeof activeTabId !== 'undefined' && activeTabId) {
+            const activeTab = tabs.find(t => t.id === activeTabId);
+            if (activeTab) {
+              activeTab.bookId = newBookId;
+              if (typeof saveTabsToStorage === 'function') {
+                saveTabsToStorage();
+              }
+              if (typeof renderTabs === 'function') {
+                renderTabs();
+              }
+            }
+          }
+          
           closeSaveLibraryModal();
           refreshLibrary();
           openLibrarySidebar();
-          showToast('success', 'Saved to library!');
+          showToast('success', isUpdate ? 'Updated in library!' : 'Saved to library!');
         } else {
           showToast('error', data.error || 'Failed to save');
         }
       } catch (err) {
+        console.error('Save to library error:', err);
         showToast('error', 'Failed to save');
       }
     }
