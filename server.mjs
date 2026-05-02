@@ -539,11 +539,15 @@ const webUIHtml = `<!DOCTYPE html>
     }
     
     body.fullscreen-mode .app-container {
-      height: calc(100vh - 49px);
+      height: 100vh;
     }
     
     body.fullscreen-mode:not(.has-tabs) .app-container {
       height: 100vh;
+    }
+    
+    body.fullscreen-mode.has-tabs .app-container {
+      height: calc(100vh - 49px);
     }
     
     body.fullscreen-mode .main-content .main {
@@ -1428,6 +1432,7 @@ console.log(greeting);
     let tabs = [];
     let activeTabId = null;
     let tabIdCounter = 0;
+    let currentBookId = null; // Track currently edited book for Supabase sync
     
     // Load tabs from localStorage
     function loadTabsFromStorage() {
@@ -1678,6 +1683,9 @@ console.log(greeting);
         const content = data.book?.content || data.book?.metadata?.content;
         
         if (data.book && content) {
+          // Track which book we're viewing for Supabase sync
+          currentBookId = bookId;
+          
           // Load content into editor (for when we exit fullscreen later)
           markdownInput.value = content;
           updateCharCount();
@@ -1842,10 +1850,11 @@ console.log(greeting);
             toggleFullscreen();
           }
           
-          // Load content into editor
-          markdownInput.value = content;
-          updateCharCount();
-          renderPreview();
+          // Track which book we're editing for Supabase sync
+          currentBookId = bookId;
+          
+          // Create/update a tab with this book
+          createNewTab(data.book.title, content, bookId);
           
           showToast('Editing: ' + data.book.title, 'success');
         }
@@ -2020,11 +2029,32 @@ console.log(greeting);
       let title = titleMatch ? titleMatch[1].substring(0, 30) : 'Untitled';
       if (titleMatch && titleMatch[1].length > 30) title += '...';
       
+      // Check for existing tab with same title
+      const existingTab = tabs.find(t => t.title === title);
+      if (existingTab) {
+        // Update existing tab
+        existingTab.content = content;
+        existingTab.theme = previewTheme;
+        existingTab.bookId = currentBookId;
+        saveTabsToStorage();
+        renderTabs();
+        switchToTab(existingTab.id);
+        
+        // If this book exists in Supabase, update it
+        if (currentBookId) {
+          updateBookInSupabase(currentBookId, content);
+        }
+        
+        showToast('Updated tab: ' + title, 'success');
+        return;
+      }
+      
       const tab = {
         id: ++tabIdCounter,
         title: title,
         content: content,
         theme: previewTheme,
+        bookId: currentBookId,
         createdAt: new Date().toISOString()
       };
       
@@ -2035,13 +2065,41 @@ console.log(greeting);
       showToast('Saved as tab: ' + title, 'success');
     }
     
+    // Update book content in Supabase
+    async function updateBookInSupabase(bookId, content) {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return; // Only sync if logged in
+      
+      try {
+        const res = await fetch('/api/books/' + bookId, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            metadata: { content },
+            file_size: new Blob([content]).size
+          })
+        });
+        
+        if (res.ok) {
+          console.log('Book synced to Supabase');
+        }
+      } catch (err) {
+        console.error('Failed to sync book:', err);
+      }
+    }
+    
     // Create a new tab with given title and content
-    function createNewTab(title, content) {
+    function createNewTab(title, content, bookId = null) {
       // Check if a tab with same title already exists
-      const existingTab = tabs.find(t => t.title === title);
+      const existingTab = tabs.find(t => t.title === title || (bookId && t.bookId === bookId));
       if (existingTab) {
         // Switch to existing tab and update content
         existingTab.content = content;
+        existingTab.bookId = bookId;
+        currentBookId = bookId;
         saveTabsToStorage();
         switchToTab(existingTab.id);
         return existingTab;
@@ -2052,9 +2110,11 @@ console.log(greeting);
         title: title.substring(0, 30) + (title.length > 30 ? '...' : ''),
         content: content,
         theme: previewTheme,
+        bookId: bookId,
         createdAt: new Date().toISOString()
       };
       
+      currentBookId = bookId;
       tabs.push(tab);
       saveTabsToStorage();
       renderTabs();
@@ -2109,6 +2169,7 @@ console.log(greeting);
       if (!tab) return;
       
       activeTabId = tabId;
+      currentBookId = tab.bookId || null;
       markdownInput.value = tab.content;
       previewTheme = tab.theme || 'light';
       updateThemeButton();
