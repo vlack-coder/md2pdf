@@ -576,38 +576,48 @@ const webUIHtml = `<!DOCTYPE html>
       display: none !important;
     }
     
-    /* Fullscreen sidebar overlay */
-    .fullscreen-sidebar-overlay {
+    /* Fullscreen sidebar - pushes content */
+    .fullscreen-sidebar-container {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(0, 0, 0, 0.7);
       z-index: 2000;
       display: none;
     }
     
-    .fullscreen-sidebar-overlay.visible {
-      display: block;
+    .fullscreen-sidebar-container.visible {
+      display: flex;
     }
     
     .fullscreen-sidebar {
-      position: fixed;
-      top: 0;
-      left: -320px;
       width: 320px;
+      min-width: 320px;
       height: 100vh;
       background-color: var(--bg-secondary);
       border-right: 1px solid var(--border);
-      z-index: 2001;
-      transition: left 0.3s ease;
       display: flex;
       flex-direction: column;
+      position: relative;
+      z-index: 10;
     }
     
-    .fullscreen-sidebar-overlay.visible .fullscreen-sidebar {
-      left: 0;
+    .fullscreen-preview-area {
+      flex: 1;
+      height: 100vh;
+      background-color: var(--bg-primary);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .fullscreen-preview-area iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #fff;
     }
     
     .fullscreen-sidebar-header {
@@ -700,6 +710,7 @@ const webUIHtml = `<!DOCTYPE html>
       color: var(--text-primary);
       font-size: 13px;
       transition: all 0.15s;
+      user-select: none;
     }
     
     .fs-folder-item:hover, .fs-book-item:hover {
@@ -848,6 +859,12 @@ const webUIHtml = `<!DOCTYPE html>
     
     body.fullscreen-mode.has-tabs .fullscreen-floating-controls-left {
       top: 65px;
+    }
+    
+    /* Hide floating controls when sidebar is open */
+    .fullscreen-sidebar-container.visible ~ .fullscreen-floating-controls-left,
+    .fullscreen-sidebar-container.visible ~ .fullscreen-floating-controls {
+      display: none !important;
     }
     
     .fullscreen-floating-controls-left .btn {
@@ -1274,13 +1291,14 @@ console.log(greeting);
     <button class="sidebar-toggle" onclick="openLibrarySidebar()" title="Open Library">📚</button>
   </div><!-- End app-container -->
   
-  <!-- Fullscreen sidebar overlay -->
-  <div class="fullscreen-sidebar-overlay" id="fullscreen-sidebar-overlay" onclick="closeFullscreenSidebar(event)">
-    <div class="fullscreen-sidebar" onclick="event.stopPropagation()">
+  <!-- Fullscreen sidebar with preview -->
+  <div class="fullscreen-sidebar-container" id="fullscreen-sidebar-container">
+    <div class="fullscreen-sidebar">
       <div class="fullscreen-sidebar-header">
         <h3>📚 Library</h3>
         <div class="fullscreen-sidebar-actions">
-          <button class="fullscreen-sidebar-close" onclick="refreshFullscreenLibrary()" title="Refresh">🔄</button>
+          <button class="fullscreen-sidebar-close" onclick="toggleFullscreenPreviewTheme()" id="fs-theme-btn" title="Toggle Theme">🌙</button>
+          <button class="fullscreen-sidebar-close" onclick="refreshLibrary(); renderFullscreenLibrary();" title="Refresh">🔄</button>
           <button class="fullscreen-sidebar-close" onclick="closeFullscreenSidebar()">&times;</button>
         </div>
       </div>
@@ -1302,7 +1320,7 @@ console.log(greeting);
             <span id="fs-books-title">All Books</span>
           </div>
           <div id="fs-books-list">
-            <div class="fs-empty-state">Loading...</div>
+            <div class="fs-empty-state">Select a book to preview</div>
           </div>
         </div>
       </div>
@@ -1313,12 +1331,17 @@ console.log(greeting);
         </button>
       </div>
     </div>
+    
+    <div class="fullscreen-preview-area">
+      <iframe id="fs-preview-frame" sandbox="allow-same-origin"></iframe>
+    </div>
   </div>
   
   <!-- Context Menu -->
   <div class="context-menu" id="context-menu">
-    <div class="context-menu-item" onclick="contextMenuAction('open')">📂 Open</div>
-    <div class="context-menu-item" onclick="contextMenuAction('rename')">✏️ Rename</div>
+    <div class="context-menu-item" onclick="contextMenuAction('open')">�️ Preview</div>
+    <div class="context-menu-item" onclick="contextMenuAction('edit')">✏️ Edit Content</div>
+    <div class="context-menu-item" onclick="contextMenuAction('rename')">Aa Rename</div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item danger" onclick="contextMenuAction('delete')">🗑️ Delete</div>
   </div>
@@ -1460,67 +1483,143 @@ console.log(greeting);
     }
     
     // Fullscreen sidebar library data
-    let fsLibraryFolders = [];
-    let fsLibraryBooks = [];
     let fsSelectedFolderId = null;
     let contextMenuTarget = null;
     
     // Fullscreen sidebar functions
     function openFullscreenSidebar() {
-      document.getElementById('fullscreen-sidebar-overlay').classList.add('visible');
-      refreshFullscreenLibrary();
-    }
-    
-    function closeFullscreenSidebar(event) {
-      if (event && event.target !== event.currentTarget) return;
-      document.getElementById('fullscreen-sidebar-overlay').classList.remove('visible');
-      hideContextMenu();
-    }
-    
-    async function refreshFullscreenLibrary() {
-      const token = localStorage.getItem('auth_token');
-      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      document.getElementById('fullscreen-sidebar-container').classList.add('visible');
+      renderFullscreenLibrary();
+      initFullscreenSidebarEvents();
       
-      try {
-        const [foldersRes, booksRes] = await Promise.all([
-          fetch('/api/folders', { headers }),
-          fetch('/api/books', { headers })
-        ]);
-        
-        const foldersData = await foldersRes.json();
-        const booksData = await booksRes.json();
-        
-        fsLibraryFolders = foldersData.folders || [];
-        fsLibraryBooks = booksData.books || [];
-        
-        renderFullscreenLibrary();
-      } catch (err) {
-        console.error('Failed to load library:', err);
+      // Copy current preview content to fullscreen preview
+      const mainPreview = document.getElementById('preview-frame');
+      const fsPreview = document.getElementById('fs-preview-frame');
+      
+      if (mainPreview && fsPreview && mainPreview.contentDocument) {
+        try {
+          const content = mainPreview.contentDocument.documentElement.outerHTML;
+          const doc = fsPreview.contentDocument;
+          doc.open();
+          doc.write('<!DOCTYPE html>' + content);
+          doc.close();
+          
+          // Apply theme
+          setTimeout(() => {
+            if (doc && doc.documentElement) {
+              doc.documentElement.setAttribute('data-theme', previewTheme);
+              if (previewTheme === 'dark') {
+                doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+              }
+              const controls = doc.querySelector('.theme-controls');
+              if (controls) controls.style.display = 'none';
+            }
+          }, 50);
+        } catch (e) {
+          console.error('Could not copy preview:', e);
+        }
       }
     }
     
+    // Initialize event delegation for fullscreen sidebar
+    let fsEventsInitialized = false;
+    function initFullscreenSidebarEvents() {
+      if (fsEventsInitialized) return;
+      fsEventsInitialized = true;
+      
+      const container = document.getElementById('fullscreen-sidebar-container');
+      if (!container) return;
+      
+      container.addEventListener('click', function(e) {
+        // Handle folder click
+        const folderItem = e.target.closest('.fs-folder-item');
+        if (folderItem) {
+          const folderId = folderItem.dataset.folderId;
+          if (folderId) {
+            selectFsFolder(folderId);
+          }
+          return;
+        }
+        
+        // Handle book action buttons
+        const actionBtn = e.target.closest('.fs-action-btn');
+        if (actionBtn) {
+          e.stopPropagation();
+          e.preventDefault();
+          const bookItem = actionBtn.closest('.fs-book-item');
+          if (bookItem) {
+            const bookId = bookItem.dataset.bookId;
+            if (actionBtn.classList.contains('delete')) {
+              deleteBook(bookId);
+            } else if (actionBtn.classList.contains('rename')) {
+              editBookName(bookId);
+            } else if (actionBtn.classList.contains('edit')) {
+              editBookContent(bookId);
+            }
+          }
+          return;
+        }
+        
+        // Handle book click (open in preview)
+        const bookItem = e.target.closest('.fs-book-item');
+        if (bookItem && !e.target.closest('.fs-book-actions')) {
+          const bookId = bookItem.dataset.bookId;
+          if (bookId) {
+            console.log('Opening book:', bookId);
+            openFsBook(bookId);
+          }
+          return;
+        }
+      });
+      
+      // Handle context menu
+      container.addEventListener('contextmenu', function(e) {
+        const folderItem = e.target.closest('.fs-folder-item');
+        if (folderItem) {
+          e.preventDefault();
+          contextMenuTarget = { type: 'folder', id: folderItem.dataset.folderId };
+          showContextMenu(e.clientX, e.clientY);
+          return;
+        }
+        
+        const bookItem = e.target.closest('.fs-book-item');
+        if (bookItem) {
+          e.preventDefault();
+          contextMenuTarget = { type: 'book', id: bookItem.dataset.bookId };
+          showContextMenu(e.clientX, e.clientY);
+          return;
+        }
+      });
+    }
+    
+    function closeFullscreenSidebar() {
+      document.getElementById('fullscreen-sidebar-container').classList.remove('visible');
+      hideContextMenu();
+    }
+    
     function renderFullscreenLibrary() {
+      // Reuse the existing library data from main sidebar
       const foldersSection = document.getElementById('fs-folders-section');
       const foldersList = document.getElementById('fs-folders-list');
       const booksList = document.getElementById('fs-books-list');
       const booksTitle = document.getElementById('fs-books-title');
       
-      // Render folders
-      if (fsLibraryFolders.length > 0) {
+      // Render folders using main library data
+      if (libraryFolders.length > 0) {
         foldersSection.style.display = 'block';
-        const rootFolders = fsLibraryFolders.filter(f => !f.parent_id);
+        const rootFolders = libraryFolders.filter(f => !f.parent_id);
         foldersList.innerHTML = rootFolders.map(f => renderFsFolder(f)).join('');
       } else {
         foldersSection.style.display = 'none';
       }
       
-      // Render books
+      // Render books using main library data
       const booksToShow = fsSelectedFolderId 
-        ? fsLibraryBooks.filter(b => b.folder_id === fsSelectedFolderId)
-        : fsLibraryBooks;
+        ? libraryBooks.filter(b => b.folder_id === fsSelectedFolderId)
+        : libraryBooks;
       
       if (fsSelectedFolderId) {
-        const folder = fsLibraryFolders.find(f => f.id === fsSelectedFolderId);
+        const folder = libraryFolders.find(f => f.id === fsSelectedFolderId);
         booksTitle.textContent = folder ? '📁 ' + folder.name : 'All Books';
       } else {
         booksTitle.textContent = 'All Books';
@@ -1537,9 +1636,7 @@ console.log(greeting);
       const isActive = folder.id === fsSelectedFolderId;
       return \`
         <div class="fs-folder-item\${isActive ? ' active' : ''}" 
-             data-folder-id="\${folder.id}"
-             onclick="selectFsFolder('\${folder.id}')"
-             oncontextmenu="showFolderContextMenu(event, '\${folder.id}')">
+             data-folder-id="\${folder.id}">
           <span>📁</span>
           <span class="fs-book-title">\${escapeHtml(folder.name)}</span>
         </div>
@@ -1550,14 +1647,13 @@ console.log(greeting);
       const icon = book.file_type === 'pdf' ? '📕' : book.file_type === 'html' ? '📄' : '📝';
       return \`
         <div class="fs-book-item" 
-             data-book-id="\${book.id}"
-             onclick="openFsBook('\${book.id}')"
-             oncontextmenu="showBookContextMenu(event, '\${book.id}')">
+             data-book-id="\${book.id}">
           <span>\${icon}</span>
           <span class="fs-book-title">\${escapeHtml(book.title)}</span>
           <div class="fs-book-actions">
-            <button class="fs-action-btn" onclick="event.stopPropagation(); editBookName('\${book.id}')" title="Rename">✏️</button>
-            <button class="fs-action-btn delete" onclick="event.stopPropagation(); deleteBook('\${book.id}')" title="Delete">🗑️</button>
+            <button class="fs-action-btn edit" title="Edit content">✏️</button>
+            <button class="fs-action-btn rename" title="Rename">Aa</button>
+            <button class="fs-action-btn delete" title="Delete">🗑️</button>
           </div>
         </div>
       \`;
@@ -1569,25 +1665,63 @@ console.log(greeting);
     }
     
     async function openFsBook(bookId) {
+      console.log('openFsBook called with:', bookId);
       const token = localStorage.getItem('auth_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       
       try {
         const res = await fetch('/api/books/' + bookId, { headers });
         const data = await res.json();
+        console.log('Book data received:', data);
         
-        if (data.book && data.book.content) {
-          // Close sidebar and exit fullscreen to show editor
-          closeFullscreenSidebar();
-          toggleFullscreen();
-          
-          // Load content
-          markdownInput.value = data.book.content;
+        // Content can be in data.book.content or data.book.metadata.content
+        const content = data.book?.content || data.book?.metadata?.content;
+        
+        if (data.book && content) {
+          // Load content into editor (for when we exit fullscreen later)
+          markdownInput.value = content;
           updateCharCount();
+          
+          // Render directly to the fullscreen preview iframe
+          const fsPreviewFrame = document.getElementById('fs-preview-frame');
+          console.log('Preview frame:', fsPreviewFrame);
+          
+          if (fsPreviewFrame) {
+            const response = await fetch('/api/render', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ markdown: content })
+            });
+            
+            const html = await response.text();
+            const doc = fsPreviewFrame.contentDocument;
+            doc.open();
+            doc.write(html);
+            doc.close();
+            
+            // Apply theme
+            setTimeout(() => {
+              if (doc && doc.documentElement) {
+                doc.documentElement.setAttribute('data-theme', previewTheme);
+                if (previewTheme === 'dark') {
+                  doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+                }
+                const controls = doc.querySelector('.theme-controls');
+                if (controls) controls.style.display = 'none';
+              }
+            }, 50);
+          }
+          
+          // Also update the main preview
           renderPreview();
+          
           showToast('Loaded: ' + data.book.title, 'success');
+        } else {
+          console.error('No book content found:', data);
+          showToast('Book has no content', 'error');
         }
       } catch (err) {
+        console.error('Error loading book:', err);
         showToast('Failed to load book', 'error');
       }
     }
@@ -1600,6 +1734,34 @@ console.log(greeting);
         const title = item.querySelector('.fs-book-title').textContent.toLowerCase();
         item.style.display = title.includes(query) ? 'flex' : 'none';
       });
+    }
+    
+    function toggleFullscreenPreviewTheme() {
+      // Toggle theme
+      previewTheme = previewTheme === 'light' ? 'dark' : 'light';
+      
+      // Update button
+      const fsThemeBtn = document.getElementById('fs-theme-btn');
+      if (fsThemeBtn) {
+        fsThemeBtn.textContent = previewTheme === 'light' ? '☀️' : '🌙';
+        fsThemeBtn.title = previewTheme === 'light' ? 'Switch to Dark' : 'Switch to Light';
+      }
+      
+      // Apply to fullscreen preview
+      const fsPreview = document.getElementById('fs-preview-frame');
+      if (fsPreview && fsPreview.contentDocument) {
+        try {
+          const doc = fsPreview.contentDocument;
+          doc.documentElement.setAttribute('data-theme', previewTheme);
+          if (previewTheme === 'dark') {
+            doc.documentElement.setAttribute('data-dark-variant', previewDarkVariant);
+          }
+        } catch (e) {}
+      }
+      
+      // Also update main preview and button
+      applyPreviewTheme();
+      updateThemeButton();
     }
     
     // Context menu functions
@@ -1643,6 +1805,10 @@ console.log(greeting);
         } else if (type === 'folder') {
           selectFsFolder(id);
         }
+      } else if (action === 'edit') {
+        if (type === 'book') {
+          editBookContent(id);
+        }
       } else if (action === 'rename') {
         if (type === 'book') {
           editBookName(id);
@@ -1658,9 +1824,42 @@ console.log(greeting);
       }
     }
     
+    async function editBookContent(bookId) {
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      
+      try {
+        const res = await fetch('/api/books/' + bookId, { headers });
+        const data = await res.json();
+        
+        // Content can be in data.book.content or data.book.metadata.content
+        const content = data.book?.content || data.book?.metadata?.content;
+        
+        if (data.book && content) {
+          // Close fullscreen sidebar and exit fullscreen mode
+          closeFullscreenSidebar();
+          if (isFullscreen) {
+            toggleFullscreen();
+          }
+          
+          // Load content into editor
+          markdownInput.value = content;
+          updateCharCount();
+          renderPreview();
+          
+          showToast('Editing: ' + data.book.title, 'success');
+        }
+      } catch (err) {
+        showToast('Failed to load book for editing', 'error');
+      }
+    }
+    
     async function editBookName(bookId) {
-      const book = fsLibraryBooks.find(b => b.id === bookId) || libraryBooks.find(b => b.id === bookId);
-      if (!book) return;
+      const book = libraryBooks.find(b => b.id === bookId);
+      if (!book) {
+        showToast('Book not found', 'error');
+        return;
+      }
       
       const newName = prompt('Enter new name:', book.title);
       if (!newName || newName === book.title) return;
@@ -1680,7 +1879,7 @@ console.log(greeting);
         
         if (res.ok) {
           showToast('Book renamed', 'success');
-          refreshFullscreenLibrary();
+          renderFullscreenLibrary();
           refreshLibrary();
         } else {
           showToast('Failed to rename book', 'error');
@@ -1704,7 +1903,7 @@ console.log(greeting);
         
         if (res.ok) {
           showToast('Book deleted', 'success');
-          refreshFullscreenLibrary();
+          renderFullscreenLibrary();
           refreshLibrary();
         } else {
           showToast('Failed to delete book', 'error');
@@ -1736,7 +1935,7 @@ console.log(greeting);
         
         if (res.ok) {
           showToast('Folder renamed', 'success');
-          refreshFullscreenLibrary();
+          renderFullscreenLibrary();
           refreshLibrary();
         } else {
           showToast('Failed to rename folder', 'error');
@@ -1761,7 +1960,7 @@ console.log(greeting);
         if (res.ok) {
           showToast('Folder deleted', 'success');
           fsSelectedFolderId = null;
-          refreshFullscreenLibrary();
+          renderFullscreenLibrary();
           refreshLibrary();
         } else {
           showToast('Failed to delete folder', 'error');
