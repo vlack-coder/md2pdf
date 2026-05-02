@@ -521,6 +521,86 @@ const webUIHtml = `<!DOCTYPE html>
       font-size: 16px;
     }
     
+    /* Fullscreen body state */
+    body.fullscreen-mode .header {
+      display: none;
+    }
+    
+    body.fullscreen-mode .library-sidebar {
+      display: none;
+    }
+    
+    body.fullscreen-mode .sidebar-toggle {
+      display: none !important;
+    }
+    
+    body.fullscreen-mode .app-container {
+      height: calc(100vh - 49px);
+    }
+    
+    body.fullscreen-mode:not(.has-tabs) .app-container {
+      height: 100vh;
+    }
+    
+    body.fullscreen-mode .main-content .main {
+      height: 100%;
+    }
+    
+    body.fullscreen-mode .main.fullscreen {
+      height: 100%;
+    }
+    
+    body.fullscreen-mode .main.fullscreen .preview-panel {
+      height: 100%;
+    }
+    
+    body.fullscreen-mode .main.fullscreen .preview-panel .panel-header {
+      display: none !important;
+    }
+    
+    body.fullscreen-mode .main.fullscreen .preview-panel .preview-container {
+      height: 100%;
+    }
+    
+    /* Floating controls in fullscreen */
+    .fullscreen-floating-controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: none;
+      gap: 8px;
+      z-index: 1000;
+      padding: 8px;
+      background-color: rgba(1, 22, 39, 0.8);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    body.fullscreen-mode .fullscreen-floating-controls {
+      display: flex;
+    }
+    
+    body.fullscreen-mode.has-tabs .fullscreen-floating-controls {
+      top: 65px;
+    }
+    
+    .fullscreen-floating-controls .btn {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    
+    .fullscreen-floating-controls .theme-dropdown-wrapper {
+      position: relative;
+    }
+    
+    .fullscreen-floating-controls .theme-dropdown {
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+    }
+    
     /* Tab System */
     .tabs-container {
       display: flex;
@@ -890,6 +970,18 @@ console.log(greeting);
     <button class="sidebar-toggle" onclick="openLibrarySidebar()" title="Open Library">📚</button>
   </div><!-- End app-container -->
   
+  <!-- Floating controls for fullscreen mode -->
+  <div class="fullscreen-floating-controls" id="fullscreen-floating-controls">
+    <button class="btn btn-secondary btn-icon" onclick="toggleFullscreen()" id="fullscreen-btn-floating" title="Exit fullscreen">
+      ⛶
+    </button>
+    <div class="theme-dropdown-wrapper">
+      <button class="btn btn-secondary btn-icon" onclick="toggleThemeDropdown()" title="Toggle preview theme">
+        🌙
+      </button>
+    </div>
+  </div>
+  
   <!-- Toast -->
   <div class="toast" id="toast">
     <span id="toast-icon">✓</span>
@@ -957,15 +1049,27 @@ console.log(greeting);
       isFullscreen = !isFullscreen;
       const main = document.querySelector('.main');
       const btn = document.getElementById('fullscreen-btn');
+      const floatingBtn = document.getElementById('fullscreen-btn-floating');
+      const body = document.body;
       
       if (isFullscreen) {
         main.classList.add('fullscreen');
+        body.classList.add('fullscreen-mode');
         btn.innerHTML = '⛶';
         btn.title = 'Exit fullscreen';
+        if (floatingBtn) {
+          floatingBtn.innerHTML = '⛶';
+          floatingBtn.title = 'Exit fullscreen';
+        }
       } else {
         main.classList.remove('fullscreen');
+        body.classList.remove('fullscreen-mode');
         btn.innerHTML = '⛶';
         btn.title = 'Toggle fullscreen preview';
+        if (floatingBtn) {
+          floatingBtn.innerHTML = '⛶';
+          floatingBtn.title = 'Toggle fullscreen preview';
+        }
       }
     }
     
