@@ -1,0 +1,25 @@
+# Render Blueprint for md2pdf E-Library
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: md2pdf
+    runtime: node
+    region: oregon  # or frankfurt, singapore, ohio
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: ADAPTER_PROVIDER
+        value: supabase
+      - key: AUTH_ENABLED
+        value: true
+      - key: SUPABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SUPABASE_KEY
+        sync: false  # Set manually in Render dashboard

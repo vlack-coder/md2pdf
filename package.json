@@ -3,6 +3,9 @@
   "version": "2.1.0",
   "description": "E-Library with markdown-to-PDF/HTML converter, Night Owl theme, and multi-provider storage support",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "bin": {
     "md2pdf": "./md2pdf"
   },
