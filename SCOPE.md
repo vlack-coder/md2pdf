@@ -19,10 +19,13 @@
 - [x] Browser-based markdown editor
 - [x] Split-pane layout (editor + preview)
 - [x] Fullscreen preview mode
+- [x] Library sidebar with folder navigation and search
 - [x] Tab system for managing multiple documents
 - [x] Drag & drop file loading
 - [x] Formatting toolbar (bold, italic, code, links, lists)
 - [x] Keyboard shortcuts
+- [x] User authentication UI (Sign in/Sign up modals)
+- [x] User profile menu and library statistics
 - [x] Character count display
 - [x] Status indicators
 
@@ -35,7 +38,7 @@
 - [x] Command-line markdown conversion
 - [x] Batch processing support
 
-### Deployment
+### Deployment & Backend
 - [x] Docker containerization
 - [x] Health check endpoint
 - [x] Configurable port via environment/args
@@ -44,11 +47,13 @@
 - [x] Folder/topic hierarchy for organizing books
 - [x] Book metadata management
 - [x] REST API for library operations
+- [x] REST API for authentication and session management
 - [x] Multi-provider adapter pattern
 - [x] Supabase adapter (PostgreSQL + Storage)
 - [x] Local adapter (JSON + Filesystem)
 - [x] Configuration via environment variables
 - [x] File upload/download support
+- [x] Real-time synchronization of book content to storage
 
 ---
 

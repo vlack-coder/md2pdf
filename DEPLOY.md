@@ -3,10 +3,12 @@
 ## Quick Deploy to Render (Recommended)
 
 ### Prerequisites
+
 - GitHub account
 - Supabase project (free tier works)
 
 ### Step 1: Set up Supabase
+
 1. Go to [supabase.com](https://supabase.com) and create a free project
 2. Go to **Settings > API** and copy:
    - Project URL (SUPABASE_URL)
@@ -14,6 +16,7 @@
 3. Go to **SQL Editor** and run the setup SQL (see `scripts/setup-supabase.mjs` for the full SQL)
 
 ### Step 2: Deploy to Render
+
 1. Push this repo to GitHub
 2. Go to [render.com](https://render.com) and sign up (free)
 3. Click **New > Blueprint**
@@ -22,9 +25,11 @@
 6. Set environment variables in the dashboard:
    - `SUPABASE_URL` = your Supabase project URL
    - `SUPABASE_KEY` = your Supabase anon key
+   - `PORT` = 8080 (or leave default)
 7. Click **Apply** and wait for deployment
 
 ### Step 3: Access Your App
+
 - Your app will be at: `https://md2pdf.onrender.com` (or your chosen name)
 - First load may take ~30 seconds (free tier cold start)
 
@@ -64,14 +69,14 @@
 
 ## Environment Variables Reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SUPABASE_URL` | Yes (for Supabase) | - | Supabase project URL |
-| `SUPABASE_KEY` | Yes (for Supabase) | - | Supabase anon/public key |
-| `ADAPTER_PROVIDER` | No | `supabase` | `supabase` or `local` |
-| `AUTH_ENABLED` | No | `true` | Enable user authentication |
-| `PORT` | No | `3000` | Server port |
-| `NODE_ENV` | No | `development` | `production` for deployment |
+| Variable           | Required           | Default       | Description                 |
+| ------------------ | ------------------ | ------------- | --------------------------- |
+| `SUPABASE_URL`     | Yes (for Supabase) | -             | Supabase project URL        |
+| `SUPABASE_KEY`     | Yes (for Supabase) | -             | Supabase anon/public key    |
+| `ADAPTER_PROVIDER` | No                 | `supabase`    | `supabase` or `local`       |
+| `AUTH_ENABLED`     | No                 | `true`        | Enable user authentication  |
+| `PORT`             | No                 | `8080`        | Server port                 |
+| `NODE_ENV`         | No                 | `development` | `production` for deployment |
 
 ---
 
@@ -100,11 +105,12 @@ npm start
 docker build -t md2pdf .
 
 # Run with environment variables
-docker run -p 3000:3000 \
+docker run -p 8080:8080 \
   -e SUPABASE_URL=https://your-project.supabase.co \
   -e SUPABASE_KEY=your-anon-key \
   -e ADAPTER_PROVIDER=supabase \
   -e AUTH_ENABLED=true \
+  -e PORT=8080 \
   md2pdf
 ```
 
@@ -113,13 +119,16 @@ docker run -p 3000:3000 \
 ## Troubleshooting
 
 ### "Cold start" delays on free tiers
+
 Free tiers spin down after inactivity. First request after sleep takes 10-30 seconds.
 
 ### Supabase connection errors
+
 - Verify SUPABASE_URL starts with `https://`
 - Verify SUPABASE_KEY is the anon/public key (not service role)
 - Check Supabase dashboard for any paused projects
 
 ### Storage/upload issues
+
 - Ensure the `library` storage bucket exists in Supabase
 - Check bucket is set to private (not public)

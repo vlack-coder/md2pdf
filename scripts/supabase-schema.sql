@@ -65,42 +65,40 @@ CREATE TRIGGER update_books_updated_at
 
 -- ==================== ROW LEVEL SECURITY (Enable when auth is enabled) ====================
 
--- Uncomment these when you enable authentication:
-
 -- Enable RLS
--- ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE books ENABLE ROW LEVEL SECURITY;
 
 -- Folders: Users can only access their own folders
--- CREATE POLICY "Users can view own folders"
---   ON folders FOR SELECT
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own folders"
+  ON folders FOR SELECT
+  USING (auth.uid() = user_id);
 
--- CREATE POLICY "Users can create own folders"
---   ON folders FOR INSERT
---   WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can create own folders"
+  ON folders FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
--- CREATE POLICY "Users can update own folders"
---   ON folders FOR UPDATE
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own folders"
+  ON folders FOR UPDATE
+  USING (auth.uid() = user_id);
 
--- CREATE POLICY "Users can delete own folders"
---   ON folders FOR DELETE
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own folders"
+  ON folders FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- Books: Users can only access their own books
--- CREATE POLICY "Users can view own books"
---   ON books FOR SELECT
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own books"
+  ON books FOR SELECT
+  USING (auth.uid() = user_id);
 
--- CREATE POLICY "Users can create own books"
---   ON books FOR INSERT
---   WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can create own books"
+  ON books FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
--- CREATE POLICY "Users can update own books"
---   ON books FOR UPDATE
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own books"
+  ON books FOR UPDATE
+  USING (auth.uid() = user_id);
 
--- CREATE POLICY "Users can delete own books"
---   ON books FOR DELETE
---   USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own books"
+  ON books FOR DELETE
+  USING (auth.uid() = user_id);

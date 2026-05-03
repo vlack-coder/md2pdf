@@ -31,7 +31,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
 
-EXPOSE 3000
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD node -e "fetch('http://localhost:3000/health').then(r => {if(!r.ok) throw 1})" || exit 1
+  CMD node -e "fetch('http://localhost:8080/health').then(r => {if(!r.ok) throw 1})" || exit 1
 CMD ["node", "server.mjs"]

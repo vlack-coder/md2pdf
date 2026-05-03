@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,7 +17,7 @@ const ROOT_DIR = join(__dirname, '..');
  */
 const defaults = {
   // Server
-  port: 3000,
+  port: 8080, // Changed from 3000 to 8080
   host: '0.0.0.0',
   
   // Adapter provider: 'local' | 'supabase'

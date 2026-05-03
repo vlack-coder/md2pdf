@@ -11,29 +11,29 @@
 
 // Load environment variables from .env file
 import { config as loadEnv } from 'dotenv';
+
 loadEnv();
 
-import { createServer } from 'http';
-import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { marked } from 'marked';
+import { existsSync, readFileSync } from 'fs';
 import hljs from 'highlight.js';
+import { createServer } from 'http';
+import { marked } from 'marked';
+import { dirname, join } from 'path';
 import puppeteer from 'puppeteer';
-
+import { fileURLToPath } from 'url';
+import { getAdapterManager, initializeAdapters } from './adapters/index.mjs';
 // Library system imports
-import { loadConfig, getAdapterConfig } from './config/index.mjs';
-import { initializeAdapters, getAdapterManager } from './adapters/index.mjs';
-import { createLibraryRoutes } from './routes/library.mjs';
+import { getAdapterConfig, loadConfig } from './config/index.mjs';
 import { createAuthRoutes } from './routes/auth.mjs';
+import { createLibraryRoutes } from './routes/library.mjs';
 import { 
-  libraryStyles, 
-  librarySidebarHtml, 
-  authModalHtml, 
-  saveLibraryModalHtml,
   authButtonsHtml,
-  userMenuHtml,
-  libraryScript 
+  authModalHtml, 
+  libraryScript, 
+  librarySidebarHtml, 
+  libraryStyles, 
+  saveLibraryModalHtml,
+  userMenuHtml
 } from './ui/library-ui.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,7 +41,7 @@ const __dirname = dirname(__filename);
 
 // Parse port from env or args
 const args = process.argv.slice(2);
-let PORT = parseInt(process.env.PORT) || 3000;
+let PORT = parseInt(process.env.PORT) || 8080; // Changed from 3000 to 8080
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--port' || args[i] === '-p') {
     PORT = parseInt(args[++i]) || PORT;
