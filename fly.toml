@@ -11,10 +11,10 @@ primary_region = "iad"  # Washington DC - change to nearest region
   NODE_ENV = "production"
   ADAPTER_PROVIDER = "supabase"
   AUTH_ENABLED = "true"
-  PORT = "8080"
+  PORT = "9990"
 
 [http_service]
-  internal_port = 8080
+  internal_port = 9990
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
@@ -22,7 +22,7 @@ primary_region = "iad"  # Washington DC - change to nearest region
 
 [[services]]
   protocol = "tcp"
-  internal_port = 8080
+  internal_port = 9990
 
   [[services.ports]]
     port = 80

@@ -18,12 +18,12 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname, basename, resolve, isAbsolute } from 'path';
-import { fileURLToPath } from 'url';
 import { glob } from 'glob';
-import { marked } from 'marked';
 import hljs from 'highlight.js';
+import { marked } from 'marked';
+import { basename, dirname, isAbsolute, join, resolve } from 'path';
 import puppeteer from 'puppeteer';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -133,7 +133,7 @@ ${colors.bright}EXAMPLES${colors.reset}
   md2pdf serve
   
   ${colors.dim}# Start on custom port${colors.reset}
-  md2pdf serve --port 8080
+  md2pdf serve --port 9990
 
 ${colors.bright}FEATURES${colors.reset}
   • Night Owl syntax highlighting with italics

@@ -25,7 +25,7 @@
 6. Set environment variables in the dashboard:
    - `SUPABASE_URL` = your Supabase project URL
    - `SUPABASE_KEY` = your Supabase anon key
-   - `PORT` = 8080 (or leave default)
+   - `PORT` = 9990 (or leave default)
 7. Click **Apply** and wait for deployment
 
 ### Step 3: Access Your App
@@ -75,7 +75,7 @@
 | `SUPABASE_KEY`     | Yes (for Supabase) | -             | Supabase anon/public key    |
 | `ADAPTER_PROVIDER` | No                 | `supabase`    | `supabase` or `local`       |
 | `AUTH_ENABLED`     | No                 | `true`        | Enable user authentication  |
-| `PORT`             | No                 | `8080`        | Server port                 |
+| `PORT`             | No                 | `9990`        | Server port                 |
 | `NODE_ENV`         | No                 | `development` | `production` for deployment |
 
 ---
@@ -105,12 +105,12 @@ npm start
 docker build -t md2pdf .
 
 # Run with environment variables
-docker run -p 8080:8080 \
+docker run -p 9990:9990 \
   -e SUPABASE_URL=https://your-project.supabase.co \
   -e SUPABASE_KEY=your-anon-key \
   -e ADAPTER_PROVIDER=supabase \
   -e AUTH_ENABLED=true \
-  -e PORT=8080 \
+  -e PORT=9990 \
   md2pdf
 ```
 

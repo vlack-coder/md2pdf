@@ -17,7 +17,7 @@ const ROOT_DIR = join(__dirname, '..');
  */
 const defaults = {
   // Server
-  port: 8080, // Changed from 3000 to 8080
+  port: 9990, // Changed from 3000 to 9990
   host: '0.0.0.0',
   
   // Adapter provider: 'local' | 'supabase'

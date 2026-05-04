@@ -41,7 +41,7 @@ const __dirname = dirname(__filename);
 
 // Parse port from env or args
 const args = process.argv.slice(2);
-let PORT = parseInt(process.env.PORT) || 8080; // Changed from 3000 to 8080
+let PORT = parseInt(process.env.PORT) || 9990; // Changed from 3000 to 9990
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--port' || args[i] === '-p') {
     PORT = parseInt(args[++i]) || PORT;

@@ -239,10 +239,10 @@ class LibraryManager {
 
 ## 🔧 **Port Configuration Update**
 
-I've updated your project to use **port 8080** instead of 3000:
+I've updated your project to use **port 9990** instead of 3000:
 
 ### **Files Updated:**
-- `server.mjs` - Default port changed to 8080
+- `server.mjs` - Default port changed to 9990
 - `config/index.mjs` - Default configuration updated
 - `DEPLOY.md` - Documentation updated
 - `Dockerfile` - Exposed port changed
@@ -250,7 +250,7 @@ I've updated your project to use **port 8080** instead of 3000:
 
 ### **Usage:**
 ```bash
-# Default (port 8080)
+# Default (port 9990)
 npm start
 
 # Custom port
@@ -259,7 +259,7 @@ npm start -- --port 9000
 PORT=9000 npm start
 
 # Docker
-docker run -p 8080:8080 md2pdf
+docker run -p 9990:9990 md2pdf
 ```
 
 ---
